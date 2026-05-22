@@ -1,0 +1,7 @@
+{
+  "name": "VeriChainIDS SOC Platform",
+  "description": "A professional Hybrid-SaaS Security Operations Center (SOC) platform with AI-driven threat detection and automated response.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

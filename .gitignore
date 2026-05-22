@@ -1,0 +1,30 @@
+# Env
+.env
+.env.*
+!.env.example
+
+# Frontend
+Frontend/node_modules/
+Frontend/dist/
+.vscode/
+# .NET
+**/bin/
+**/obj/
+**/appsettings.Development.json
+**/.vscode
+build-verify
+# Logs / local scripts
+*.log
+.dotnet
+# Local docs not for GitHub
+CYBERMONITOR_TECHNICAL_DOC.md
+HƯỚNG_DẪN_CÀI_ĐẶT.md
+test_fake_traffic.py
+test_attack_simulation.py
+build
+__pycache__/
+%TEMP%
+BUG_REPORT_AND_FIXES.md
+Documentation
+.vs
+rules
