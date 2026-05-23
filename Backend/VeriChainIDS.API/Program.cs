@@ -118,6 +118,7 @@ builder.Services.AddScoped<VeriChainIDS.API.Services.ITelegramService, VeriChain
 builder.Services.AddHttpClient<VeriChainIDS.API.Services.IBlockchainService, VeriChainIDS.API.Services.CardanoBlockchainService>();
 builder.Services.AddHostedService<VeriChainIDS.API.Services.AlertDigestBackgroundService>();
 builder.Services.AddHostedService<VeriChainIDS.API.Services.AgentHealthBackgroundService>();
+builder.Services.AddHostedService<VeriChainIDS.API.Services.BlockchainConfirmationBackgroundService>();
 builder.Services.AddHttpClient();
 
 builder.Services.AddCors(options =>
@@ -279,6 +280,11 @@ BEGIN
         CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
         ConfirmedAt DATETIME2 NULL,
         ErrorMessage NVARCHAR(MAX) NULL,
+        RetryCount INT NOT NULL DEFAULT 0,
+        LastRetryAt DATETIME2 NULL,
+        NextRetryAt DATETIME2 NULL,
+        LastSubmittedAt DATETIME2 NULL,
+        LastCheckedAt DATETIME2 NULL,
         CONSTRAINT FK_BlockchainRecords_Tenants_TenantId FOREIGN KEY (TenantId) REFERENCES Tenants(Id) ON DELETE CASCADE
     );
 END;
@@ -290,6 +296,16 @@ BEGIN
         ALTER TABLE BlockchainRecords ADD MetadataLabel NVARCHAR(50) NOT NULL DEFAULT '674';
     IF COL_LENGTH('BlockchainRecords', 'ErrorMessage') IS NULL
         ALTER TABLE BlockchainRecords ADD ErrorMessage NVARCHAR(MAX) NULL;
+    IF COL_LENGTH('BlockchainRecords', 'RetryCount') IS NULL
+        ALTER TABLE BlockchainRecords ADD RetryCount INT NOT NULL DEFAULT 0;
+    IF COL_LENGTH('BlockchainRecords', 'LastRetryAt') IS NULL
+        ALTER TABLE BlockchainRecords ADD LastRetryAt DATETIME2 NULL;
+    IF COL_LENGTH('BlockchainRecords', 'NextRetryAt') IS NULL
+        ALTER TABLE BlockchainRecords ADD NextRetryAt DATETIME2 NULL;
+    IF COL_LENGTH('BlockchainRecords', 'LastSubmittedAt') IS NULL
+        ALTER TABLE BlockchainRecords ADD LastSubmittedAt DATETIME2 NULL;
+    IF COL_LENGTH('BlockchainRecords', 'LastCheckedAt') IS NULL
+        ALTER TABLE BlockchainRecords ADD LastCheckedAt DATETIME2 NULL;
 END;
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_BlockchainRecords_TenantId_CreatedAt' AND object_id = OBJECT_ID('BlockchainRecords'))
@@ -300,6 +316,36 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_BlockchainRecords_TxHa
     CREATE INDEX IX_BlockchainRecords_TxHash ON BlockchainRecords(TxHash);
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_BlockchainRecords_Tenant_Record_Entity' AND object_id = OBJECT_ID('BlockchainRecords'))
     CREATE UNIQUE INDEX IX_BlockchainRecords_Tenant_Record_Entity ON BlockchainRecords(TenantId, RecordType, EntityId);
+
+-- Migration: immutable evidence snapshots used for retry/proof reports
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'EvidenceSnapshots')
+BEGIN
+    CREATE TABLE EvidenceSnapshots (
+        Id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        TenantId UNIQUEIDENTIFIER NOT NULL,
+        BlockchainRecordId UNIQUEIDENTIFIER NULL,
+        RecordType NVARCHAR(50) NOT NULL,
+        EntityId NVARCHAR(200) NOT NULL,
+        SchemaVersion NVARCHAR(80) NOT NULL DEFAULT 'verichainids.evidence.v1',
+        SnapshotHash NVARCHAR(64) NOT NULL,
+        SnapshotJson NVARCHAR(MAX) NOT NULL,
+        CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        CONSTRAINT FK_EvidenceSnapshots_Tenants_TenantId FOREIGN KEY (TenantId) REFERENCES Tenants(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_EvidenceSnapshots_BlockchainRecords_BlockchainRecordId FOREIGN KEY (BlockchainRecordId) REFERENCES BlockchainRecords(Id) ON DELETE SET NULL
+    );
+END;
+ELSE
+BEGIN
+    IF COL_LENGTH('EvidenceSnapshots', 'BlockchainRecordId') IS NULL
+        ALTER TABLE EvidenceSnapshots ADD BlockchainRecordId UNIQUEIDENTIFIER NULL;
+    IF COL_LENGTH('EvidenceSnapshots', 'SchemaVersion') IS NULL
+        ALTER TABLE EvidenceSnapshots ADD SchemaVersion NVARCHAR(80) NOT NULL DEFAULT 'verichainids.evidence.v1';
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_EvidenceSnapshots_Tenant_Record_Entity' AND object_id = OBJECT_ID('EvidenceSnapshots'))
+    CREATE INDEX IX_EvidenceSnapshots_Tenant_Record_Entity ON EvidenceSnapshots(TenantId, RecordType, EntityId);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_EvidenceSnapshots_BlockchainRecordId' AND object_id = OBJECT_ID('EvidenceSnapshots'))
+    CREATE INDEX IX_EvidenceSnapshots_BlockchainRecordId ON EvidenceSnapshots(BlockchainRecordId);
 ");
         Console.WriteLine("Database connected successfully!");
     }

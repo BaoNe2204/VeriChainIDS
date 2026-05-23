@@ -69,6 +69,11 @@ export interface BlockchainRecord {
   confirmedAt: string | null;
   errorMessage: string | null;
   explorerUrl: string | null;
+  retryCount?: number;
+  lastRetryAt?: string | null;
+  nextRetryAt?: string | null;
+  lastSubmittedAt?: string | null;
+  lastCheckedAt?: string | null;
 }
 
 // --- Agent / Server ---

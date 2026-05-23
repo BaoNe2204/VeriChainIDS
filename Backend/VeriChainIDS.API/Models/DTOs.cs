@@ -392,7 +392,12 @@ public record BlockchainRecordDto(
     DateTime CreatedAt,
     DateTime? ConfirmedAt,
     string? ErrorMessage,
-    string? ExplorerUrl
+    string? ExplorerUrl,
+    int RetryCount = 0,
+    DateTime? LastRetryAt = null,
+    DateTime? NextRetryAt = null,
+    DateTime? LastSubmittedAt = null,
+    DateTime? LastCheckedAt = null
 );
 
 public record BlockchainStatsDto(
@@ -418,6 +423,59 @@ public record BlockchainVerifyResponse(
     string Source,
     string Message,
     string? ExplorerUrl
+);
+
+public record CardanoTransactionStatus(
+    bool Exists,
+    long? BlockHeight,
+    DateTime? BlockTime,
+    string? ErrorMessage
+);
+
+public record BlockchainHealthDto(
+    string Network,
+    string SubmissionMode,
+    string SubmitterStatus,
+    bool? SubmitterOnline,
+    decimal? WalletAda,
+    long? WalletLovelace,
+    bool? WalletFunded,
+    bool BlockfrostConfigured,
+    string? CardanoAddress,
+    DateTime? LastSuccessfulSubmit,
+    string? LastSuccessfulTxHash,
+    string? LastError,
+    DateTime CheckedAt
+);
+
+public record EvidenceSnapshotDto(
+    Guid Id,
+    string RecordType,
+    string EntityId,
+    string SchemaVersion,
+    string SnapshotHash,
+    string SnapshotJson,
+    DateTime CreatedAt
+);
+
+public record BlockchainProofReportDto(
+    Guid EvidenceId,
+    string RecordType,
+    string EntityId,
+    string DataHash,
+    string? TxHash,
+    string Network,
+    string MetadataLabel,
+    long? BlockHeight,
+    DateTime CreatedAt,
+    DateTime? ConfirmedAt,
+    string Status,
+    bool? VerifyResult,
+    string VerifyMessage,
+    string? CardanoscanLink,
+    int RetryCount,
+    string? ErrorMessage,
+    EvidenceSnapshotDto? Snapshot
 );
 
 public record BlockchainAnchorAlertRequest(

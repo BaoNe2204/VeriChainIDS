@@ -20,6 +20,7 @@ public class VeriChainIDSDbContext : DbContext
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<BlockchainRecord> BlockchainRecords => Set<BlockchainRecord>();
+    public DbSet<EvidenceSnapshot> EvidenceSnapshots => Set<EvidenceSnapshot>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BlockedIP> BlockedIPs => Set<BlockedIP>();
     public DbSet<ServerAlertEmail> ServerAlertEmails => Set<ServerAlertEmail>();
@@ -205,6 +206,7 @@ public class VeriChainIDSDbContext : DbContext
             e.Property(b => b.Status).HasDefaultValue("Pending");
             e.Property(b => b.Network).HasDefaultValue("preprod");
             e.Property(b => b.MetadataLabel).HasDefaultValue("674");
+            e.Property(b => b.RetryCount).HasDefaultValue(0);
             e.HasIndex(b => new { b.TenantId, b.CreatedAt }).HasDatabaseName("IX_BlockchainRecords_TenantId_CreatedAt");
             e.HasIndex(b => new { b.TenantId, b.Status }).HasDatabaseName("IX_BlockchainRecords_TenantId_Status");
             e.HasIndex(b => b.TxHash).HasDatabaseName("IX_BlockchainRecords_TxHash");
@@ -215,6 +217,23 @@ public class VeriChainIDSDbContext : DbContext
                 .WithMany(t => t.BlockchainRecords)
                 .HasForeignKey(b => b.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EvidenceSnapshot
+        modelBuilder.Entity<EvidenceSnapshot>(e =>
+        {
+            e.Property(s => s.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            e.Property(s => s.SchemaVersion).HasDefaultValue("verichainids.evidence.v1");
+            e.HasIndex(s => new { s.TenantId, s.RecordType, s.EntityId }).HasDatabaseName("IX_EvidenceSnapshots_Tenant_Record_Entity");
+            e.HasIndex(s => s.BlockchainRecordId).HasDatabaseName("IX_EvidenceSnapshots_BlockchainRecordId");
+            e.HasOne(s => s.Tenant)
+                .WithMany(t => t.EvidenceSnapshots)
+                .HasForeignKey(s => s.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(s => s.BlockchainRecord)
+                .WithMany(r => r.EvidenceSnapshots)
+                .HasForeignKey(s => s.BlockchainRecordId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Notification

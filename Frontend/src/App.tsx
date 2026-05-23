@@ -54,6 +54,7 @@ import { AgentSetupGuide } from './components/AgentSetupGuide';
 import { ApiManagement } from './components/ApiManagement';
 import { Defense } from './components/Defense';
 import { BlockchainVerify } from './components/BlockchainVerify';
+import { PublicBlockchainVerify } from './components/PublicBlockchainVerify';
 import { Whitelist } from './components/Whitelist';
 import { CheckoutPage } from './components/CheckoutPage';
 import { PaymentResultPage, type DemoPaymentResult } from './components/PaymentResultPage';
@@ -869,6 +870,10 @@ export default function App() {
   );
 
   // --- Rendering ---
+
+  if (['/verifier', '/public/verify', '/blockchain/verify-public'].includes(window.location.pathname)) {
+    return <PublicBlockchainVerify theme={theme} />;
+  }
 
   if (demoResult !== null || window.location.pathname === '/payment-result') {
     return (

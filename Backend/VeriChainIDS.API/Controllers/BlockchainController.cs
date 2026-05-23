@@ -95,6 +95,13 @@ public class BlockchainController : ControllerBase
         return Ok(new ApiResponse<BlockchainStatsDto>(true, "OK", records ?? new BlockchainStatsDto(0, 0, 0, 0, 0, 0, 0)));
     }
 
+    [HttpGet("health")]
+    public async Task<ActionResult<ApiResponse<BlockchainHealthDto>>> GetHealth()
+    {
+        var health = await _blockchainService.GetHealthAsync(HttpContext.RequestAborted);
+        return Ok(new ApiResponse<BlockchainHealthDto>(true, "OK", health));
+    }
+
     [HttpGet("alert/{alertId:guid}/proof")]
     public async Task<ActionResult<ApiResponse<BlockchainRecordDto>>> GetAlertProof(Guid alertId)
     {
@@ -154,6 +161,68 @@ public class BlockchainController : ControllerBase
         return await VerifyCore(txHash, expectedHash);
     }
 
+    [HttpPost("verify-public")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<BlockchainVerifyResponse>>> VerifyPublic([FromBody] BlockchainVerifyRequest request)
+    {
+        return await VerifyCore(request.TxHash, request.ExpectedHash, enforceTenant: false);
+    }
+
+    [HttpPost("records/{recordId:guid}/retry")]
+    public async Task<ActionResult<ApiResponse<BlockchainRecordDto>>> RetryRecord(Guid recordId)
+    {
+        var record = await _db.BlockchainRecords.AsNoTracking().FirstOrDefaultAsync(r => r.Id == recordId);
+        if (record == null)
+            return NotFound(new ApiResponse<BlockchainRecordDto>(false, "Blockchain record not found.", null));
+        if (!CanAccessTenant(record.TenantId))
+            return Forbid();
+
+        var retried = await _blockchainService.RetryRecordAsync(recordId, HttpContext.RequestAborted);
+        return Ok(new ApiResponse<BlockchainRecordDto>(true, "Blockchain retry submitted.", MapRecordDto(retried)));
+    }
+
+    [HttpPost("records/{recordId:guid}/confirm")]
+    public async Task<ActionResult<ApiResponse<BlockchainRecordDto>>> ConfirmRecord(Guid recordId)
+    {
+        var record = await _db.BlockchainRecords.FirstOrDefaultAsync(r => r.Id == recordId);
+        if (record == null)
+            return NotFound(new ApiResponse<BlockchainRecordDto>(false, "Blockchain record not found.", null));
+        if (!CanAccessTenant(record.TenantId))
+            return Forbid();
+        if (string.IsNullOrWhiteSpace(record.TxHash))
+            return BadRequest(new ApiResponse<BlockchainRecordDto>(false, "Record has no TxHash yet.", MapRecordDto(record)));
+
+        var status = await _blockchainService.GetTransactionStatusAsync(record.TxHash, HttpContext.RequestAborted);
+        record.LastCheckedAt = DateTime.UtcNow;
+        if (status.Exists)
+        {
+            record.Status = "Confirmed";
+            record.BlockHeight = status.BlockHeight;
+            record.ConfirmedAt = status.BlockTime ?? DateTime.UtcNow;
+            record.ErrorMessage = null;
+        }
+        else if (!string.IsNullOrWhiteSpace(status.ErrorMessage))
+        {
+            record.ErrorMessage = status.ErrorMessage;
+        }
+
+        await _db.SaveChangesAsync(HttpContext.RequestAborted);
+        return Ok(new ApiResponse<BlockchainRecordDto>(true, status.Exists ? "Transaction confirmed." : "Transaction is not confirmed yet.", MapRecordDto(record)));
+    }
+
+    [HttpGet("records/{recordId:guid}/proof-report")]
+    public async Task<ActionResult<ApiResponse<BlockchainProofReportDto>>> GetProofReport(Guid recordId)
+    {
+        var record = await _db.BlockchainRecords.AsNoTracking().FirstOrDefaultAsync(r => r.Id == recordId);
+        if (record == null)
+            return NotFound(new ApiResponse<BlockchainProofReportDto>(false, "Blockchain record not found.", null));
+        if (!CanAccessTenant(record.TenantId))
+            return Forbid();
+
+        var report = await _blockchainService.BuildProofReportAsync(recordId, HttpContext.RequestAborted);
+        return Ok(new ApiResponse<BlockchainProofReportDto>(true, "OK", report));
+    }
+
     [HttpGet("ip-reputation/{ipAddress}")]
     public async Task<ActionResult<ApiResponse<IpReputationResult>>> GetIpReputation(string ipAddress)
     {
@@ -178,18 +247,51 @@ public class BlockchainController : ControllerBase
         }));
     }
 
-    private async Task<ActionResult<ApiResponse<BlockchainVerifyResponse>>> VerifyCore(string txHash, string expectedHash)
+    private async Task<ActionResult<ApiResponse<BlockchainVerifyResponse>>> VerifyCore(string txHash, string expectedHash, bool enforceTenant = true)
     {
+        if (!enforceTenant)
+        {
+            var publicOnChainHash = await _blockchainService.GetOnChainHashAsync(txHash, HttpContext.RequestAborted);
+            if (!string.IsNullOrWhiteSpace(publicOnChainHash))
+            {
+                var publicMatch = string.Equals(publicOnChainHash, expectedHash, StringComparison.OrdinalIgnoreCase);
+                return Ok(new ApiResponse<BlockchainVerifyResponse>(true, "OK", new BlockchainVerifyResponse(
+                    publicMatch,
+                    txHash,
+                    expectedHash,
+                    publicOnChainHash,
+                    "Cardano metadata",
+                    publicMatch ? "Expected hash matches Cardano metadata." : "Expected hash does not match Cardano metadata.",
+                    _blockchainService.GetExplorerUrl(txHash)
+                )));
+            }
+        }
+
         var local = await _db.BlockchainRecords
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.TxHash == txHash);
 
-        if (local != null && !CanAccessTenant(local.TenantId))
+        if (enforceTenant && local != null && !CanAccessTenant(local.TenantId))
             return Forbid();
 
         if (local != null)
         {
             var localMatch = string.Equals(local.DataHash, expectedHash, StringComparison.OrdinalIgnoreCase);
+            if (!enforceTenant && !local.Network.Contains("demo", StringComparison.OrdinalIgnoreCase) && local.Status != "Confirmed")
+            {
+                return Ok(new ApiResponse<BlockchainVerifyResponse>(true, "OK", new BlockchainVerifyResponse(
+                    false,
+                    txHash,
+                    expectedHash,
+                    local.DataHash,
+                    $"Local evidence record ({local.Status})",
+                    local.Status == "Failed"
+                        ? $"Blockchain transaction failed: {local.ErrorMessage ?? "unknown error"}"
+                        : "Blockchain transaction is still pending confirmation.",
+                    _blockchainService.GetExplorerUrl(local.TxHash, local.Network)
+                )));
+            }
+
             return Ok(new ApiResponse<BlockchainVerifyResponse>(true, "OK", new BlockchainVerifyResponse(
                 localMatch,
                 txHash,
@@ -233,7 +335,12 @@ public class BlockchainController : ControllerBase
         record.CreatedAt,
         record.ConfirmedAt,
         record.ErrorMessage,
-        _blockchainService.GetExplorerUrl(record.TxHash, record.Network)
+        _blockchainService.GetExplorerUrl(record.TxHash, record.Network),
+        record.RetryCount,
+        record.LastRetryAt,
+        record.NextRetryAt,
+        record.LastSubmittedAt,
+        record.LastCheckedAt
     );
 
     private bool CanAccessTenant(Guid tenantId)

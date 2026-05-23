@@ -28,6 +28,7 @@ public class Tenant
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<AlertDigestQueue> AlertDigestQueue { get; set; } = new List<AlertDigestQueue>();
     public ICollection<BlockchainRecord> BlockchainRecords { get; set; } = new List<BlockchainRecord>();
+    public ICollection<EvidenceSnapshot> EvidenceSnapshots { get; set; } = new List<EvidenceSnapshot>();
 }
 
 public class User
@@ -498,9 +499,50 @@ public class BlockchainRecord
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ConfirmedAt { get; set; }
     public string? ErrorMessage { get; set; }
+    public int RetryCount { get; set; } = 0;
+    public DateTime? LastRetryAt { get; set; }
+    public DateTime? NextRetryAt { get; set; }
+    public DateTime? LastSubmittedAt { get; set; }
+    public DateTime? LastCheckedAt { get; set; }
 
     [ForeignKey(nameof(TenantId))]
     public Tenant Tenant { get; set; } = null!;
+
+    public ICollection<EvidenceSnapshot> EvidenceSnapshots { get; set; } = new List<EvidenceSnapshot>();
+}
+
+public class EvidenceSnapshot
+{
+    [Key]
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    [Required]
+    public Guid TenantId { get; set; }
+
+    public Guid? BlockchainRecordId { get; set; }
+
+    [Required, MaxLength(50)]
+    public string RecordType { get; set; } = string.Empty;
+
+    [Required, MaxLength(200)]
+    public string EntityId { get; set; } = string.Empty;
+
+    [Required, MaxLength(80)]
+    public string SchemaVersion { get; set; } = "verichainids.evidence.v1";
+
+    [Required, MaxLength(64)]
+    public string SnapshotHash { get; set; } = string.Empty;
+
+    [Required]
+    public string SnapshotJson { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(TenantId))]
+    public Tenant Tenant { get; set; } = null!;
+
+    [ForeignKey(nameof(BlockchainRecordId))]
+    public BlockchainRecord? BlockchainRecord { get; set; }
 }
 
 public class Notification

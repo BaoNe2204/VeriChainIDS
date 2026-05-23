@@ -14,7 +14,11 @@ public interface IBlockchainService
     Task<BlockchainRecord> RecordAuditLogAsync(AuditLog auditLog, CancellationToken cancellationToken = default);
 
     Task<string?> GetOnChainHashAsync(string txHash, CancellationToken cancellationToken = default);
+    Task<CardanoTransactionStatus> GetTransactionStatusAsync(string txHash, CancellationToken cancellationToken = default);
     Task<bool> VerifyRecordAsync(string txHash, string expectedHash, CancellationToken cancellationToken = default);
+    Task<BlockchainRecord> RetryRecordAsync(Guid recordId, CancellationToken cancellationToken = default);
+    Task<BlockchainHealthDto> GetHealthAsync(CancellationToken cancellationToken = default);
+    Task<BlockchainProofReportDto?> BuildProofReportAsync(Guid recordId, CancellationToken cancellationToken = default);
     Task<IpReputationResult> QueryIpReputationAsync(string ipAddress, CancellationToken cancellationToken = default);
     Task<string?> ReportMaliciousIpAsync(string ipAddress, string attackType, string severity, CancellationToken cancellationToken = default);
 }

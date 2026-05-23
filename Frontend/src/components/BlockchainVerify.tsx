@@ -1,14 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Activity,
   AlertTriangle,
   CheckCircle2,
   Clock3,
   Copy,
   Database,
+  Download,
   ExternalLink,
   FileCheck2,
+  FileText,
   Link2,
   RefreshCw,
+  RotateCcw,
   Search,
   XCircle,
 } from 'lucide-react';
@@ -16,6 +20,8 @@ import { cn } from '../lib/utils';
 import { Theme } from '../types';
 import {
   BlockchainApi,
+  type BlockchainHealth,
+  type BlockchainProofReport,
   type BlockchainRecord,
   type BlockchainStats,
   type BlockchainVerifyResult,
@@ -40,6 +46,7 @@ const emptyStats: BlockchainStats = {
 export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
   const [records, setRecords] = useState<BlockchainRecord[]>([]);
   const [stats, setStats] = useState<BlockchainStats>(emptyStats);
+  const [health, setHealth] = useState<BlockchainHealth | null>(null);
   const [loading, setLoading] = useState(false);
   const [recordType, setRecordType] = useState('all');
   const [status, setStatus] = useState('all');
@@ -49,6 +56,8 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
   const [verifyResult, setVerifyResult] = useState<BlockchainVerifyResult | null>(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
+  const [retryingId, setRetryingId] = useState('');
+  const [downloadingId, setDownloadingId] = useState('');
 
   const filters = useMemo(() => ({
     recordType: recordType === 'all' ? undefined : recordType,
@@ -59,9 +68,10 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
     setLoading(true);
     setError('');
     try {
-      const [recordsRes, statsRes] = await Promise.all([
+      const [recordsRes, statsRes, healthRes] = await Promise.all([
         BlockchainApi.getRecords(1, 50, filters),
         BlockchainApi.getStats(),
+        BlockchainApi.getHealth(),
       ]);
 
       if (recordsRes.success && recordsRes.data) {
@@ -72,6 +82,10 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
 
       if (statsRes.success && statsRes.data) {
         setStats(statsRes.data);
+      }
+
+      if (healthRes.success && healthRes.data) {
+        setHealth(healthRes.data);
       }
     } finally {
       setLoading(false);
@@ -113,6 +127,61 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
     setVerifyResult(null);
   };
 
+  const retryRecord = async (record: BlockchainRecord) => {
+    setRetryingId(record.id);
+    setError('');
+    try {
+      const res = await BlockchainApi.retryRecord(record.id);
+      if (res.success) {
+        await loadData();
+      } else {
+        setError(res.message || 'Retry failed.');
+      }
+    } finally {
+      setRetryingId('');
+    }
+  };
+
+  const confirmRecord = async (record: BlockchainRecord) => {
+    setRetryingId(record.id);
+    setError('');
+    try {
+      const res = await BlockchainApi.confirmRecord(record.id);
+      if (res.success) {
+        await loadData();
+      } else {
+        setError(res.message || 'Confirmation check failed.');
+      }
+    } finally {
+      setRetryingId('');
+    }
+  };
+
+  const downloadProofReport = async (record: BlockchainRecord, format: 'json' | 'pdf') => {
+    setDownloadingId(record.id);
+    setError('');
+    try {
+      const res = await BlockchainApi.getProofReport(record.id);
+      if (!res.success || !res.data) {
+        setError(res.message || 'Proof report failed.');
+        return;
+      }
+      const blob = format === 'json'
+        ? new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' })
+        : new Blob([createProofPdf(res.data)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `verichainids-proof-${record.recordType}-${record.id.slice(0, 8)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingId('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -132,6 +201,25 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
           Refresh
         </button>
       </div>
+
+      {health && (
+        <div className={cn('border rounded-lg p-4', theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm')}>
+          <div className="mb-4 flex items-center gap-2">
+            <Activity size={18} className="text-cyan-400" />
+            <h3 className={cn('font-bold', theme === 'dark' ? 'text-white' : 'text-slate-900')}>Blockchain Health</h3>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <HealthItem theme={theme} label="Network" value={health.network} />
+            <HealthItem theme={theme} label="Mode" value={health.submissionMode} />
+            <HealthItem theme={theme} label="Submitter" value={health.submitterStatus} tone={health.submitterOnline === false ? 'rose' : health.submitterOnline === true ? 'emerald' : 'slate'} />
+            <HealthItem theme={theme} label="Wallet" value={health.walletFunded == null ? 'Unknown' : health.walletFunded ? `${health.walletAda ?? 0} ADA` : 'Not funded'} tone={health.walletFunded === false ? 'rose' : health.walletFunded === true ? 'emerald' : 'slate'} />
+            <HealthItem theme={theme} label="Blockfrost" value={health.blockfrostConfigured ? 'Configured' : 'Missing'} tone={health.blockfrostConfigured ? 'emerald' : 'rose'} />
+            <HealthItem theme={theme} label="Last Submit" value={health.lastSuccessfulSubmit ? formatRelativeCompactTruoc(health.lastSuccessfulSubmit) : 'None'} />
+            <HealthItem theme={theme} label="Address" value={health.cardanoAddress ? truncateMiddle(health.cardanoAddress, 12, 8) : 'None'} title={health.cardanoAddress || undefined} />
+            <HealthItem theme={theme} label="Last Error" value={health.lastError || 'None'} tone={health.lastError ? 'rose' : 'slate'} title={health.lastError || undefined} />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatBlock theme={theme} icon={Database} label="Total Records" value={stats.totalRecords} tone="blue" />
@@ -257,6 +345,9 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
                     <td className={cn('px-4 py-3 text-sm font-bold', theme === 'dark' ? 'text-slate-200' : 'text-slate-800')}>{record.recordType}</td>
                     <td className="px-4 py-3">
                       <BlockchainBadge proof={record} theme={theme} compact />
+                      {(record.retryCount ?? 0) > 0 && (
+                        <p className="mt-1 text-[10px] text-slate-500">Retry {record.retryCount}</p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <HashText value={record.dataHash} theme={theme} />
@@ -275,6 +366,46 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
                           title="Use for verification"
                         >
                           <Search size={14} />
+                        </button>
+                        {record.status === 'Failed' && (
+                          <button
+                            type="button"
+                            onClick={() => retryRecord(record)}
+                            disabled={retryingId === record.id}
+                            className={cn('p-2 rounded-lg transition-colors disabled:opacity-40', theme === 'dark' ? 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20' : 'bg-amber-100 text-amber-700 hover:bg-amber-200')}
+                            title="Retry transaction"
+                          >
+                            <RotateCcw size={14} className={retryingId === record.id ? 'animate-spin' : ''} />
+                          </button>
+                        )}
+                        {record.status === 'Pending' && record.txHash && !record.network.toLowerCase().includes('demo') && (
+                          <button
+                            type="button"
+                            onClick={() => confirmRecord(record)}
+                            disabled={retryingId === record.id}
+                            className={cn('p-2 rounded-lg transition-colors disabled:opacity-40', theme === 'dark' ? 'bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20' : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200')}
+                            title="Check confirmation"
+                          >
+                            <RefreshCw size={14} className={retryingId === record.id ? 'animate-spin' : ''} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => downloadProofReport(record, 'json')}
+                          disabled={downloadingId === record.id}
+                          className={cn('p-2 rounded-lg transition-colors disabled:opacity-40', theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')}
+                          title="Download JSON proof"
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadProofReport(record, 'pdf')}
+                          disabled={downloadingId === record.id}
+                          className={cn('p-2 rounded-lg transition-colors disabled:opacity-40', theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200')}
+                          title="Download PDF proof"
+                        >
+                          <FileText size={14} />
                         </button>
                         <button
                           type="button"
@@ -303,6 +434,29 @@ export const BlockchainVerify = ({ theme }: BlockchainVerifyProps) => {
     </div>
   );
 };
+
+const HealthItem = ({ theme, label, value, tone = 'slate', title }: {
+  theme: Theme;
+  label: string;
+  value: string;
+  tone?: 'slate' | 'emerald' | 'rose';
+  title?: string;
+}) => (
+  <div className={cn('rounded-lg border px-3 py-2', theme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200')}>
+    <p className="text-[10px] uppercase font-bold text-slate-500">{label}</p>
+    <p
+      className={cn(
+        'mt-1 truncate text-sm font-bold',
+        tone === 'slate' && (theme === 'dark' ? 'text-slate-200' : 'text-slate-800'),
+        tone === 'emerald' && 'text-emerald-500',
+        tone === 'rose' && 'text-rose-500'
+      )}
+      title={title || value}
+    >
+      {value}
+    </p>
+  </div>
+);
 
 const StatBlock = ({ theme, icon: Icon, label, value, tone }: {
   theme: Theme;
@@ -338,3 +492,59 @@ const HashText = ({ value, theme, empty = 'None' }: { value: string; theme: Them
 
 const truncateMiddle = (value: string, start = 8, end = 6) =>
   value.length <= start + end + 3 ? value : `${value.slice(0, start)}...${value.slice(-end)}`;
+
+const createProofPdf = (report: BlockchainProofReport): string => {
+  const lines = [
+    'VeriChainIDS Blockchain Proof Report',
+    `Evidence ID: ${report.evidenceId}`,
+    `Record Type: ${report.recordType}`,
+    `Entity ID: ${report.entityId}`,
+    `Status: ${report.status}`,
+    `Verify Result: ${report.verifyResult === null ? 'Unknown' : report.verifyResult ? 'Valid' : 'Invalid'}`,
+    `Verify Message: ${report.verifyMessage}`,
+    `Data Hash: ${report.dataHash}`,
+    `TxHash: ${report.txHash || 'None'}`,
+    `Network: ${report.network}`,
+    `Metadata Label: ${report.metadataLabel}`,
+    `Block Height: ${report.blockHeight ?? 'None'}`,
+    `Created At: ${report.createdAt}`,
+    `Confirmed At: ${report.confirmedAt || 'None'}`,
+    `Retry Count: ${report.retryCount}`,
+    `Cardanoscan: ${report.cardanoscanLink || 'None'}`,
+    `Snapshot Hash: ${report.snapshot?.snapshotHash || 'None'}`,
+  ];
+
+  const content = lines
+    .slice(0, 36)
+    .map((line, index) => `BT /F1 10 Tf 48 ${760 - index * 18} Td (${escapePdfText(line)}) Tj ET`)
+    .join('\n');
+
+  const objects = [
+    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
+    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+    `5 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  for (const obj of objects) {
+    offsets.push(pdf.length);
+    pdf += `${obj}\n`;
+  }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  pdf += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n `).join('\n');
+  pdf += `\ntrailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return pdf;
+};
+
+const escapePdfText = (value: string): string =>
+  value
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .slice(0, 112);

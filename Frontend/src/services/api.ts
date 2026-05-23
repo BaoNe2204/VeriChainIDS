@@ -390,6 +390,11 @@ export interface BlockchainRecord {
   confirmedAt: string | null;
   errorMessage: string | null;
   explorerUrl: string | null;
+  retryCount: number;
+  lastRetryAt: string | null;
+  nextRetryAt: string | null;
+  lastSubmittedAt: string | null;
+  lastCheckedAt: string | null;
 }
 
 export interface Alert {
@@ -897,6 +902,52 @@ export interface IpReputationResult {
   isGloballyBlocked: boolean;
 }
 
+export interface BlockchainHealth {
+  network: string;
+  submissionMode: string;
+  submitterStatus: string;
+  submitterOnline: boolean | null;
+  walletAda: number | null;
+  walletLovelace: number | null;
+  walletFunded: boolean | null;
+  blockfrostConfigured: boolean;
+  cardanoAddress: string | null;
+  lastSuccessfulSubmit: string | null;
+  lastSuccessfulTxHash: string | null;
+  lastError: string | null;
+  checkedAt: string;
+}
+
+export interface EvidenceSnapshot {
+  id: string;
+  recordType: string;
+  entityId: string;
+  schemaVersion: string;
+  snapshotHash: string;
+  snapshotJson: string;
+  createdAt: string;
+}
+
+export interface BlockchainProofReport {
+  evidenceId: string;
+  recordType: string;
+  entityId: string;
+  dataHash: string;
+  txHash: string | null;
+  network: string;
+  metadataLabel: string;
+  blockHeight: number | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  status: string;
+  verifyResult: boolean | null;
+  verifyMessage: string;
+  cardanoscanLink: string | null;
+  retryCount: number;
+  errorMessage: string | null;
+  snapshot: EvidenceSnapshot | null;
+}
+
 export const BlockchainApi = {
   getRecords: async (page = 1, pageSize = 20, filters?: { recordType?: string; status?: string }) => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
@@ -909,6 +960,10 @@ export const BlockchainApi = {
     return request<BlockchainStats>('/api/blockchain/stats');
   },
 
+  getHealth: async () => {
+    return request<BlockchainHealth>('/api/blockchain/health');
+  },
+
   getAlertProof: async (alertId: string) => {
     return request<BlockchainRecord>(`/api/blockchain/alert/${alertId}/proof`);
   },
@@ -919,6 +974,22 @@ export const BlockchainApi = {
 
   verify: async (txHash: string, expectedHash: string) => {
     return request<BlockchainVerifyResult>('/api/blockchain/verify', { txHash, expectedHash }, { method: 'POST' });
+  },
+
+  verifyPublic: async (txHash: string, expectedHash: string) => {
+    return request<BlockchainVerifyResult>('/api/blockchain/verify-public', { txHash, expectedHash }, { method: 'POST' });
+  },
+
+  retryRecord: async (recordId: string) => {
+    return request<BlockchainRecord>(`/api/blockchain/records/${recordId}/retry`, undefined, { method: 'POST' });
+  },
+
+  confirmRecord: async (recordId: string) => {
+    return request<BlockchainRecord>(`/api/blockchain/records/${recordId}/confirm`, undefined, { method: 'POST' });
+  },
+
+  getProofReport: async (recordId: string) => {
+    return request<BlockchainProofReport>(`/api/blockchain/records/${recordId}/proof-report`);
   },
 
   getIpReputation: async (ipAddress: string) => {
