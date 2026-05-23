@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { cn } from '../lib/utils';
 import { Theme, Alert } from '../types';
 import { formatRelativeCompactTruoc, getApiTimeMs } from '../utils/dateUtils';
+import { BlockchainBadge } from './BlockchainBadge';
 
 interface IncidentsProps {
   theme: Theme;
@@ -104,6 +105,7 @@ export const Incidents = ({ theme, t, recentAlerts, setSelectedDetail }: Inciden
                   <th className="px-4 py-4 font-medium w-32">Server</th>
                   <th className="px-4 py-4 font-medium w-24">MITRE</th>
                   <th className="px-4 py-4 font-medium w-28">Trạng Thái</th>
+                  <th className="px-4 py-4 font-medium w-32">Proof</th>
                   <th className="px-4 py-4 font-medium w-24">{t.time || 'Thời Gian'}</th>
                   <th className="px-4 py-4 font-medium w-20">Action</th>
                 </tr>
@@ -149,6 +151,9 @@ export const Incidents = ({ theme, t, recentAlerts, setSelectedDetail }: Inciden
                       )}>
                         {alert.status || 'Open'}
                       </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <BlockchainBadge proof={alert.blockchainProof || null} theme={theme} compact />
                     </td>
                     <td className="px-4 py-4 text-xs text-slate-500 whitespace-nowrap">{formatRelativeCompactTruoc(alert.createdAt)}</td>
                     <td className="px-4 py-4">

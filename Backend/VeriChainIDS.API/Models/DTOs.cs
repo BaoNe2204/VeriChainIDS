@@ -190,7 +190,8 @@ public record AlertDto(
     DateTime? AcknowledgedAt,
     DateTime? ResolvedAt,
     string? AcknowledgedByName,
-    string? ResolvedByName
+    string? ResolvedByName,
+    BlockchainRecordDto? BlockchainProof = null
 );
 
 public record TriggerAlertRequest(
@@ -374,6 +375,68 @@ public record AuditLogDto(
     string? IpAddress,
     DateTime Timestamp,
     string? Details
+);
+
+// ============ BLOCKCHAIN DTOs ============
+public record BlockchainRecordDto(
+    Guid Id,
+    Guid TenantId,
+    string RecordType,
+    string EntityId,
+    string DataHash,
+    string? TxHash,
+    long? BlockHeight,
+    string Status,
+    string Network,
+    string MetadataLabel,
+    DateTime CreatedAt,
+    DateTime? ConfirmedAt,
+    string? ErrorMessage,
+    string? ExplorerUrl
+);
+
+public record BlockchainStatsDto(
+    int TotalRecords,
+    int PendingRecords,
+    int ConfirmedRecords,
+    int FailedRecords,
+    int AlertRecords,
+    int BlockIpRecords,
+    int AuditLogRecords
+);
+
+public record BlockchainVerifyRequest(
+    [Required] string TxHash,
+    [Required] string ExpectedHash
+);
+
+public record BlockchainVerifyResponse(
+    bool IsValid,
+    string TxHash,
+    string ExpectedHash,
+    string? OnChainHash,
+    string Source,
+    string Message,
+    string? ExplorerUrl
+);
+
+public record BlockchainAnchorAlertRequest(
+    [Required] Guid AlertId
+);
+
+public record ReportMaliciousIpRequest(
+    [Required] string IpAddress,
+    string? AttackType,
+    string? Severity
+);
+
+public record IpReputationResult(
+    string IpAddress,
+    string IpHash,
+    int ReportCount,
+    double SeverityScore,
+    DateTime? LastReported,
+    bool IsGloballyBlocked
 );
 
 // ============ DASHBOARD DTOs ============

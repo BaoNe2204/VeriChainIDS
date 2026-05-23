@@ -19,6 +19,7 @@ import {
   Bell,
   Ticket,
   MessageSquare,
+  Link2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Theme } from '../types';
@@ -110,6 +111,7 @@ export const Sidebar = ({
           <SidebarItem icon={ShieldAlert} label={t.incidents} active={activeTab === 'incidents'} onClick={() => { setActiveTab('incidents'); setIsMobileMenuOpen(false); }} theme={theme} isOpen={isSidebarOpen || isMobileMenuOpen} />
           <SidebarItem icon={Bot} label={t.ai} active={activeTab === 'ai'} onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }} theme={theme} isOpen={isSidebarOpen || isMobileMenuOpen} />
           <SidebarItem icon={Shield} label="Defense" active={activeTab === 'defense'} onClick={() => { setActiveTab('defense'); setIsMobileMenuOpen(false); }} theme={theme} isOpen={isSidebarOpen || isMobileMenuOpen} />
+          <SidebarItem icon={Link2} label="Blockchain" active={activeTab === 'blockchain'} onClick={() => { setActiveTab('blockchain'); setIsMobileMenuOpen(false); }} theme={theme} isOpen={isSidebarOpen || isMobileMenuOpen} />
           <SidebarItem icon={ShieldCheck} label="Whitelist" active={activeTab === 'whitelist'} onClick={() => { setActiveTab('whitelist'); setIsMobileMenuOpen(false); }} theme={theme} isOpen={isSidebarOpen || isMobileMenuOpen} />
           <SidebarItem icon={FileText} label={t.reports} active={activeTab === 'reports'} onClick={() => { setActiveTab('reports'); setIsMobileMenuOpen(false); }} theme={theme} isOpen={isSidebarOpen || isMobileMenuOpen} />
           {!isStaff && (

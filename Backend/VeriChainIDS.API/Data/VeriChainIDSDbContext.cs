@@ -19,6 +19,7 @@ public class VeriChainIDSDbContext : DbContext
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<TicketComment> TicketComments => Set<TicketComment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<BlockchainRecord> BlockchainRecords => Set<BlockchainRecord>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BlockedIP> BlockedIPs => Set<BlockedIP>();
     public DbSet<ServerAlertEmail> ServerAlertEmails => Set<ServerAlertEmail>();
@@ -195,6 +196,25 @@ public class VeriChainIDSDbContext : DbContext
         {
             e.Property(a => a.Timestamp).HasDefaultValueSql("GETUTCDATE()");
             e.HasIndex(a => new { a.TenantId, a.Timestamp }).HasDatabaseName("IX_AuditLogs_TenantId_Time");
+        });
+
+        // BlockchainRecord
+        modelBuilder.Entity<BlockchainRecord>(e =>
+        {
+            e.Property(b => b.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            e.Property(b => b.Status).HasDefaultValue("Pending");
+            e.Property(b => b.Network).HasDefaultValue("preprod");
+            e.Property(b => b.MetadataLabel).HasDefaultValue("674");
+            e.HasIndex(b => new { b.TenantId, b.CreatedAt }).HasDatabaseName("IX_BlockchainRecords_TenantId_CreatedAt");
+            e.HasIndex(b => new { b.TenantId, b.Status }).HasDatabaseName("IX_BlockchainRecords_TenantId_Status");
+            e.HasIndex(b => b.TxHash).HasDatabaseName("IX_BlockchainRecords_TxHash");
+            e.HasIndex(b => new { b.TenantId, b.RecordType, b.EntityId })
+                .IsUnique()
+                .HasDatabaseName("IX_BlockchainRecords_Tenant_Record_Entity");
+            e.HasOne(b => b.Tenant)
+                .WithMany(t => t.BlockchainRecords)
+                .HasForeignKey(b => b.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Notification

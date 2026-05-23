@@ -51,6 +51,24 @@ export interface Alert {
   resolvedAt?: string | null;
   acknowledgedByName?: string | null;
   resolvedByName?: string | null;
+  blockchainProof?: BlockchainRecord | null;
+}
+
+export interface BlockchainRecord {
+  id: string;
+  tenantId: string;
+  recordType: string;
+  entityId: string;
+  dataHash: string;
+  txHash: string | null;
+  blockHeight: number | null;
+  status: string;
+  network: string;
+  metadataLabel: string;
+  createdAt: string;
+  confirmedAt: string | null;
+  errorMessage: string | null;
+  explorerUrl: string | null;
 }
 
 // --- Agent / Server ---

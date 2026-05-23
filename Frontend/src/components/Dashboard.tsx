@@ -28,6 +28,7 @@ import { Theme, Agent, Alert } from '../types';
 import { StatCard } from './common/StatCard';
 import { DashboardSkeleton, AgentListSkeleton } from './SkeletonLoader';
 import { formatRelativeCompactTruoc } from '../utils/dateUtils';
+import { BlockchainBadge } from './BlockchainBadge';
 
 interface DashboardProps {
   theme: Theme;
@@ -350,6 +351,7 @@ export const Dashboard = memo(({
                     <th className="px-4 py-3">{t.message || 'Thông điệp'}</th>
                     <th className="px-4 py-3">IP Nguồn</th>
                     <th className="px-4 py-3">MITRE</th>
+                    <th className="px-4 py-3">Proof</th>
                     <th className="px-4 py-3">{t.time || 'Thời gian'}</th>
                   </tr>
                 </thead>
@@ -384,6 +386,9 @@ export const Dashboard = memo(({
                         <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono font-medium", theme === 'dark' ? "bg-slate-800/70 text-slate-400" : "bg-slate-100 text-slate-600")}>
                           {alert.mitreTechnique || alert.mitreTactic || '—'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                        <BlockchainBadge proof={alert.blockchainProof || null} theme={theme} compact />
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500 font-medium">{formatRelativeCompactTruoc(alert.createdAt)}</td>
                     </tr>

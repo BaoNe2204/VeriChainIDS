@@ -66,6 +66,12 @@ public class DashboardController : ControllerBase
             .OrderByDescending(a => a.CreatedAt)
             .Take(10)
             .ToListAsync();
+
+        var recentAlertIds = recentAlerts.Select(a => a.Id.ToString()).ToList();
+        var alertProofs = await _db.BlockchainRecords
+            .AsNoTracking()
+            .Where(r => r.RecordType == "Alert" && recentAlertIds.Contains(r.EntityId))
+            .ToDictionaryAsync(r => r.EntityId);
         
         var bandwidthIn = await trafficQuery.Where(t => t.Timestamp >= oneHourAgo).SumAsync(t => t.BytesIn);
         var bandwidthOut = await trafficQuery.Where(t => t.Timestamp >= oneHourAgo).SumAsync(t => t.BytesOut);
@@ -133,11 +139,32 @@ public class DashboardController : ControllerBase
             bandwidthIn,
             bandwidthOut,
             servers.Select(s => new ServerHealthDto(s.Id, s.Name, s.IpAddress, s.Status, s.CpuUsage, s.RamUsage, s.DiskUsage, s.LastSeenAt)).ToList(),
-            recentAlerts.Select(a => new AlertDto(
+            recentAlerts.Select(a =>
+            {
+                alertProofs.TryGetValue(a.Id.ToString(), out var proof);
+                return new AlertDto(
                 a.Id, a.TenantId, a.ServerId, a.Server?.Name, a.Severity, a.AlertType, a.Title, a.Description,
                 a.SourceIp, a.TargetAsset, a.MitreTactic, a.MitreTechnique, a.Status, a.AnomalyScore,
                 a.RecommendedAction, a.CreatedAt, a.AcknowledgedAt, a.ResolvedAt,
-                a.AcknowledgedByUser?.FullName, a.ResolvedByUser?.FullName)).ToList(),
+                a.AcknowledgedByUser?.FullName, a.ResolvedByUser?.FullName,
+                proof == null
+                    ? null
+                    : new BlockchainRecordDto(
+                        proof.Id,
+                        proof.TenantId,
+                        proof.RecordType,
+                        proof.EntityId,
+                        proof.DataHash,
+                        proof.TxHash,
+                        proof.BlockHeight,
+                        proof.Status,
+                        proof.Network,
+                        proof.MetadataLabel,
+                        proof.CreatedAt,
+                        proof.ConfirmedAt,
+                        proof.ErrorMessage,
+                        GetExplorerUrl(proof.TxHash, proof.Network)));
+            }).ToList(),
             trafficData,
             attackTypes,
             mitreData
@@ -287,5 +314,24 @@ public class DashboardController : ControllerBase
             "MEDIUM" => "Medium",
             _ => "Low"
         };
+    }
+
+    private static string? GetExplorerUrl(string? txHash, string? network)
+    {
+        if (string.IsNullOrWhiteSpace(txHash))
+            return null;
+
+        var effectiveNetwork = (network ?? "preprod").ToLowerInvariant();
+        if (effectiveNetwork.Contains("demo", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var explorerBase = effectiveNetwork switch
+        {
+            "mainnet" => "https://cardanoscan.io/transaction",
+            "preview" => "https://preview.cardanoscan.io/transaction",
+            _ => "https://preprod.cardanoscan.io/transaction"
+        };
+
+        return $"{explorerBase}/{txHash}";
     }
 }

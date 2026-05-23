@@ -129,6 +129,7 @@ function processDashboardData(rawData: any) {
     serverName: alert.serverName || alert.ServerName || alert.serverId || '',
     createdAt: alert.createdAt || alert.CreatedAt || alert.timestamp || alert.detectedAt || new Date().toISOString(),
     status: alert.status || alert.Status || 'Open',
+    blockchainProof: alert.blockchainProof || alert.BlockchainProof || null,
   }));
 
   // Stats - handle both PascalCase (backend) and camelCase

@@ -375,6 +375,23 @@ export interface ServerTelegramRecipient {
   createdAt: string;
 }
 
+export interface BlockchainRecord {
+  id: string;
+  tenantId: string;
+  recordType: 'Alert' | 'BlockIP' | 'AuditLog' | string;
+  entityId: string;
+  dataHash: string;
+  txHash: string | null;
+  blockHeight: number | null;
+  status: 'Pending' | 'Confirmed' | 'Failed' | string;
+  network: string;
+  metadataLabel: string;
+  createdAt: string;
+  confirmedAt: string | null;
+  errorMessage: string | null;
+  explorerUrl: string | null;
+}
+
 export interface Alert {
   id: string;
   tenantId: string;
@@ -396,6 +413,7 @@ export interface Alert {
   resolvedAt: string | null;
   acknowledgedByName: string | null;
   resolvedByName: string | null;
+  blockchainProof?: BlockchainRecord | null;
 }
 
 export interface Ticket {
@@ -843,6 +861,72 @@ export const AlertsApi = {
 
   updateStatus: async (id: string, status: string, updatedBy?: string) => {
     return request(`/api/alerts/${id}/status`, { alertId: id, status, updatedBy }, { method: 'PUT' });
+  },
+};
+
+// ============================================================================
+// BLOCKCHAIN API
+// ============================================================================
+
+export interface BlockchainStats {
+  totalRecords: number;
+  pendingRecords: number;
+  confirmedRecords: number;
+  failedRecords: number;
+  alertRecords: number;
+  blockIpRecords: number;
+  auditLogRecords: number;
+}
+
+export interface BlockchainVerifyResult {
+  isValid: boolean;
+  txHash: string;
+  expectedHash: string;
+  onChainHash: string | null;
+  source: string;
+  message: string;
+  explorerUrl: string | null;
+}
+
+export interface IpReputationResult {
+  ipAddress: string;
+  ipHash: string;
+  reportCount: number;
+  severityScore: number;
+  lastReported: string | null;
+  isGloballyBlocked: boolean;
+}
+
+export const BlockchainApi = {
+  getRecords: async (page = 1, pageSize = 20, filters?: { recordType?: string; status?: string }) => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (filters?.recordType) params.append('recordType', filters.recordType);
+    if (filters?.status) params.append('status', filters.status);
+    return request<PagedResult<BlockchainRecord>>(`/api/blockchain/records?${params}`);
+  },
+
+  getStats: async () => {
+    return request<BlockchainStats>('/api/blockchain/stats');
+  },
+
+  getAlertProof: async (alertId: string) => {
+    return request<BlockchainRecord>(`/api/blockchain/alert/${alertId}/proof`);
+  },
+
+  anchorAlert: async (alertId: string) => {
+    return request<BlockchainRecord>(`/api/blockchain/alerts/${alertId}/anchor`, undefined, { method: 'POST' });
+  },
+
+  verify: async (txHash: string, expectedHash: string) => {
+    return request<BlockchainVerifyResult>('/api/blockchain/verify', { txHash, expectedHash }, { method: 'POST' });
+  },
+
+  getIpReputation: async (ipAddress: string) => {
+    return request<IpReputationResult>(`/api/blockchain/ip-reputation/${encodeURIComponent(ipAddress)}`);
+  },
+
+  reportIp: async (ipAddress: string, attackType?: string, severity?: string) => {
+    return request('/api/blockchain/report-ip', { ipAddress, attackType, severity }, { method: 'POST' });
   },
 };
 
@@ -1417,6 +1501,7 @@ export function createSignalRConnection(callbacks: SignalRCallbacks): { connect:
           recommendedAction: alertDto.recommendedAction, createdAt: alertDto.createdAt,
           acknowledgedAt: alertDto.acknowledgedAt, resolvedAt: alertDto.resolvedAt,
           acknowledgedByName: alertDto.acknowledgedByName, resolvedByName: alertDto.resolvedByName,
+          blockchainProof: alertDto.blockchainProof || null,
         };
         console.log('[SignalR] ReceiveAlert:', alert.title);
         callbacks.onAlert?.(alert);
@@ -1433,6 +1518,7 @@ export function createSignalRConnection(callbacks: SignalRCallbacks): { connect:
           recommendedAction: alertDto.recommendedAction, createdAt: alertDto.createdAt,
           acknowledgedAt: alertDto.acknowledgedAt, resolvedAt: alertDto.resolvedAt,
           acknowledgedByName: alertDto.acknowledgedByName, resolvedByName: alertDto.resolvedByName,
+          blockchainProof: alertDto.blockchainProof || null,
         };
         console.log('[SignalR] AlertStatusChanged:', alert.title);
         callbacks.onAlertStatusChanged?.(alert);

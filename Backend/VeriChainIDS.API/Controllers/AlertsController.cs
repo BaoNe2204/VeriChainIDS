@@ -21,6 +21,7 @@ public class AlertsController : ControllerBase
     private readonly IHubContext<AlertHub, IAlertHub> _alertHub;
     private readonly IEmailService _emailService;
     private readonly ITelegramService _telegramService;
+    private readonly IBlockchainService _blockchainService;
     private readonly ILogger<AlertsController> _logger;
     private readonly IConfiguration _configuration = null!;
 
@@ -29,6 +30,7 @@ public class AlertsController : ControllerBase
         IHubContext<AlertHub, IAlertHub> alertHub,
         IEmailService emailService,
         ITelegramService telegramService,
+        IBlockchainService blockchainService,
         ILogger<AlertsController> logger,
         IConfiguration configuration)
     {
@@ -36,6 +38,7 @@ public class AlertsController : ControllerBase
         _alertHub = alertHub;
         _emailService = emailService;
         _telegramService = telegramService;
+        _blockchainService = blockchainService;
         _logger = logger;
         _configuration = configuration;
     }
@@ -91,6 +94,16 @@ public class AlertsController : ControllerBase
             _db.Alerts.Add(alert);
             await _db.SaveChangesAsync();
 
+            BlockchainRecord? blockchainProof = null;
+            try
+            {
+                blockchainProof = await _blockchainService.RecordAlertAsync(alert, HttpContext.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Blockchain recording failed for alert {AlertId}", alert.Id);
+            }
+
             _db.AuditLogs.Add(new AuditLog
             {
                 TenantId = tenantId,
@@ -111,12 +124,12 @@ public class AlertsController : ControllerBase
 
             var ticket = await CreateAutoTicket(alert);
             await SendAlertNotifications(alert, ticket);
-            await _alertHub.Clients.Group(tenantId.Value.ToString()).ReceiveAlert(MapAlertDto(alert));
+            await _alertHub.Clients.Group(tenantId.Value.ToString()).ReceiveAlert(MapAlertDto(alert, blockchainProof));
 
             _logger.LogWarning("ALERT TRIGGERED: {Type} - {Title} | Severity: {Severity} | Source: {SourceIp}",
                 request.AlertType, request.Title, request.Severity, request.SourceIp);
 
-            return Ok(new ApiResponse<AlertDto>(true, "Alert đã được tạo!", MapAlertDto(alert)));
+            return Ok(new ApiResponse<AlertDto>(true, "Alert đã được tạo!", MapAlertDto(alert, blockchainProof)));
         }
         catch (Exception ex)
         {
@@ -172,8 +185,14 @@ public class AlertsController : ControllerBase
             .Take(pageSize)
             .ToListAsync();
 
+        var alertEntityIds = items.Select(a => a.Id.ToString()).ToList();
+        var proofs = await _db.BlockchainRecords
+            .AsNoTracking()
+            .Where(r => r.RecordType == "Alert" && alertEntityIds.Contains(r.EntityId))
+            .ToDictionaryAsync(r => r.EntityId);
+
         return Ok(new ApiResponse<PagedResult<AlertDto>>(true, "OK", new PagedResult<AlertDto>(
-            items.Select(MapAlertDto).ToList(),
+            items.Select(a => MapAlertDto(a, proofs.GetValueOrDefault(a.Id.ToString()))).ToList(),
             totalCount,
             page,
             pageSize,
@@ -201,7 +220,11 @@ public class AlertsController : ControllerBase
         if (role != "SuperAdmin" && alert.TenantId != tenantId)
             return Forbid();
 
-        return Ok(new ApiResponse<AlertDto>(true, "OK", MapAlertDto(alert)));
+        var proof = await _db.BlockchainRecords
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TenantId == alert.TenantId && r.RecordType == "Alert" && r.EntityId == alert.Id.ToString());
+
+        return Ok(new ApiResponse<AlertDto>(true, "OK", MapAlertDto(alert, proof)));
     }
 
     /// <summary>Cập nhật trạng thái alert</summary>
@@ -244,7 +267,11 @@ public class AlertsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        var dto = MapAlertDto(alert);
+        var proof = await _db.BlockchainRecords
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TenantId == alert.TenantId && r.RecordType == "Alert" && r.EntityId == alert.Id.ToString());
+
+        var dto = MapAlertDto(alert, proof);
         await _alertHub.Clients.Group(alert.TenantId.ToString()).ReceiveAlert(dto);
 
         return Ok(new ApiResponse<AlertDto>(true, $"Alert status updated to {request.Status}", dto));
@@ -462,7 +489,7 @@ public class AlertsController : ControllerBase
         return bool.TryParse(enabled, out var value) && value;
     }
 
-    private static AlertDto MapAlertDto(Alert a) => new(
+    private AlertDto MapAlertDto(Alert a, BlockchainRecord? proof = null) => new(
         a.Id,
         a.TenantId,
         a.ServerId,
@@ -482,8 +509,29 @@ public class AlertsController : ControllerBase
         a.AcknowledgedAt,
         a.ResolvedAt,
         a.AcknowledgedByUser?.FullName,
-        a.ResolvedByUser?.FullName
+        a.ResolvedByUser?.FullName,
+        MapBlockchainRecordDto(proof)
     );
+
+    private BlockchainRecordDto? MapBlockchainRecordDto(BlockchainRecord? record) =>
+        record == null
+            ? null
+            : new BlockchainRecordDto(
+                record.Id,
+                record.TenantId,
+                record.RecordType,
+                record.EntityId,
+                record.DataHash,
+                record.TxHash,
+                record.BlockHeight,
+                record.Status,
+                record.Network,
+                record.MetadataLabel,
+                record.CreatedAt,
+                record.ConfirmedAt,
+                record.ErrorMessage,
+                _blockchainService.GetExplorerUrl(record.TxHash, record.Network)
+            );
 
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Guid.Empty.ToString());

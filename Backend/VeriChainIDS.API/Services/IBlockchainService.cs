@@ -1,0 +1,20 @@
+using VeriChainIDS.API.Models;
+using VeriChainIDS.API.Models.DTOs;
+
+namespace VeriChainIDS.API.Services;
+
+public interface IBlockchainService
+{
+    string ComputeHash(object data);
+    string ComputeIpHash(string ipAddress);
+    string? GetExplorerUrl(string? txHash, string? network = null);
+
+    Task<BlockchainRecord> RecordAlertAsync(Alert alert, CancellationToken cancellationToken = default);
+    Task<BlockchainRecord> RecordBlockActionAsync(BlockedIP blockedIp, CancellationToken cancellationToken = default);
+    Task<BlockchainRecord> RecordAuditLogAsync(AuditLog auditLog, CancellationToken cancellationToken = default);
+
+    Task<string?> GetOnChainHashAsync(string txHash, CancellationToken cancellationToken = default);
+    Task<bool> VerifyRecordAsync(string txHash, string expectedHash, CancellationToken cancellationToken = default);
+    Task<IpReputationResult> QueryIpReputationAsync(string ipAddress, CancellationToken cancellationToken = default);
+    Task<string?> ReportMaliciousIpAsync(string ipAddress, string attackType, string severity, CancellationToken cancellationToken = default);
+}

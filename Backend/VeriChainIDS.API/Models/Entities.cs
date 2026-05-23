@@ -27,6 +27,7 @@ public class Tenant
     public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<AlertDigestQueue> AlertDigestQueue { get; set; } = new List<AlertDigestQueue>();
+    public ICollection<BlockchainRecord> BlockchainRecords { get; set; } = new List<BlockchainRecord>();
 }
 
 public class User
@@ -461,6 +462,45 @@ public class AuditLog
 
     [ForeignKey(nameof(UserId))]
     public User? User { get; set; }
+}
+
+public class BlockchainRecord
+{
+    [Key]
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    [Required]
+    public Guid TenantId { get; set; }
+
+    [Required, MaxLength(50)]
+    public string RecordType { get; set; } = string.Empty;
+
+    [Required, MaxLength(200)]
+    public string EntityId { get; set; } = string.Empty;
+
+    [Required, MaxLength(64)]
+    public string DataHash { get; set; } = string.Empty;
+
+    [MaxLength(64)]
+    public string? TxHash { get; set; }
+
+    public long? BlockHeight { get; set; }
+
+    [Required, MaxLength(20)]
+    public string Status { get; set; } = "Pending";
+
+    [MaxLength(50)]
+    public string Network { get; set; } = "preprod";
+
+    [MaxLength(50)]
+    public string MetadataLabel { get; set; } = "674";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ConfirmedAt { get; set; }
+    public string? ErrorMessage { get; set; }
+
+    [ForeignKey(nameof(TenantId))]
+    public Tenant Tenant { get; set; } = null!;
 }
 
 public class Notification

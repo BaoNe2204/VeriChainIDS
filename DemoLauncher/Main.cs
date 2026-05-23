@@ -13,23 +13,41 @@ public partial class Main : Form
     private Process? backendProcess;
     private Process? aiEngineProcess;
     private Process? frontendProcess;
+    private Process? blockchainProcess;
 
     private bool backendRunning = false;
     private bool aiEngineRunning = false;
     private bool frontendRunning = false;
+    private bool blockchainRunning = false;
+    private bool autoStarted = false;
 
     private string backendPath = "";
     private string aiEnginePath = "";
     private string frontendPath = "";
+    private string blockchainPath = "";
     private string backendPort = "5000";
     private string aiEnginePort = "5000";
     private string frontendPort = "3000";
+    private string blockchainPort = "8090";
 
     public Main()
     {
         InitializeComponent();
         LoadSettings();
+        this.Shown += Main_Shown;
         this.FormClosing += Main_FormClosing;
+    }
+
+    private async void Main_Shown(object? sender, EventArgs e)
+    {
+        if (autoStarted)
+        {
+            return;
+        }
+
+        autoStarted = true;
+        await Task.Delay(500);
+        BtnStartAll_Click(btnStartAll, EventArgs.Empty);
     }
 
     private void Main_FormClosing(object? sender, FormClosingEventArgs e)
@@ -40,7 +58,7 @@ public partial class Main : Form
 
     private void KillAllProcessesByPort()
     {
-        var ports = new[] { 5000, 3000, 5001, 8000, 24678 };
+        var ports = new[] { 5000, 3000, 5001, 8000, 8090, 24678 };
         foreach (var port in ports)
         {
             try
@@ -64,6 +82,7 @@ public partial class Main : Form
         backendPath = Path.Combine(GetProjectRoot(), "Backend", "VeriChainIDS.API");
         aiEnginePath = Path.Combine(GetProjectRoot(), "Al-Engine");
         frontendPath = Path.Combine(GetProjectRoot(), "Frontend");
+        blockchainPath = Path.Combine(GetProjectRoot(), "Blockchain");
         
         txtBackendPath.Text = backendPath;
         txtAIEnginePath.Text = aiEnginePath;
@@ -135,17 +154,22 @@ public partial class Main : Form
 
     private void BtnStartAll_Click(object? sender, EventArgs e)
     {
+        KillAllProcessesByPort();
+        StartBlockchain();
         StartBackend();
         StartAIEngine();
         StartFrontend();
+        OpenFrontendAfterDelay();
 
         btnBackend.Text = "\u23F9 Dừng Backend";
         btnAIEngine.Text = "\u23F9 Dừng AI Engine";
         btnFrontend.Text = "\u23F9 Dừng Frontend";
 
-        backendRunning = true;
-        aiEngineRunning = true;
-        frontendRunning = true;
+        blockchainRunning = blockchainProcess != null && !blockchainProcess.HasExited;
+        backendRunning = backendProcess != null && !backendProcess.HasExited;
+        aiEngineRunning = aiEngineProcess != null && !aiEngineProcess.HasExited;
+        frontendRunning = frontendProcess != null && !frontendProcess.HasExited;
+        UpdateStatus();
     }
 
     private void BtnStopAll_Click(object? sender, EventArgs e)
@@ -159,6 +183,7 @@ public partial class Main : Form
         backendRunning = false;
         aiEngineRunning = false;
         frontendRunning = false;
+        blockchainRunning = false;
     }
 
     private void BtnClearAll_Click(object? sender, EventArgs e)
@@ -167,6 +192,7 @@ public partial class Main : Form
         txtAIEngineLog.Clear();
         txtFrontendLog.Clear();
         LogToBackend("\uD83D\uDDD1\uFE0F Logs cleared");
+        LogToBlockchain("\uD83D\uDDD1\uFE0F Blockchain log cleared");
         LogToAIEngine("\uD83D\uDDD1\uFE0F Logs cleared");
         LogToFrontend("\uD83D\uDDD1\uFE0F Logs cleared");
     }
@@ -217,6 +243,95 @@ public partial class Main : Form
     private void BtnCloseSettings_Click(object? sender, EventArgs e)
     {
         panelSettings.Visible = false;
+    }
+
+    #endregion
+
+    #region Blockchain Methods
+
+    private void StartBlockchain()
+    {
+        try
+        {
+            if (!Directory.Exists(blockchainPath))
+            {
+                LogToBlockchain($"\u274C Blockchain folder not found: {blockchainPath}");
+                return;
+            }
+
+            var signingKeyPath = Path.Combine(blockchainPath, "wallet", "payment.skey");
+            var addressPath = Path.Combine(blockchainPath, "wallet", "payment.addr");
+            if (!File.Exists(signingKeyPath) || !File.Exists(addressPath))
+            {
+                LogToBlockchain("\u26A0\uFE0F Wallet files not found. Need Blockchain\\wallet\\payment.skey and payment.addr.");
+            }
+
+            var pythonExe = ResolvePythonExecutable(Path.Combine(blockchainPath, ".venv", "Scripts", "python.exe"));
+            LogToBlockchain($"\uD83D\uDE80 Starting Cardano submitter on port {blockchainPort}...");
+            LogToBlockchain($"Python: {pythonExe}");
+            lblStatus.Text = "Starting Blockchain submitter...";
+
+            blockchainProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"-m uvicorn Blockchain.submitter:app --host 127.0.0.1 --port {blockchainPort}",
+                    WorkingDirectory = GetProjectRoot(),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                }
+            };
+
+            blockchainProcess.OutputDataReceived += (s, e) =>
+            {
+                if (e.Data != null)
+                    BeginInvoke(new Action(() => LogToBlockchain(e.Data)));
+            };
+
+            blockchainProcess.ErrorDataReceived += (s, e) =>
+            {
+                if (e.Data != null)
+                    BeginInvoke(new Action(() => LogToBlockchain($"[ERROR] {e.Data}")));
+            };
+
+            blockchainProcess.Start();
+            blockchainProcess.BeginOutputReadLine();
+            blockchainProcess.BeginErrorReadLine();
+
+            blockchainRunning = true;
+            LogToBlockchain("\u2705 Cardano submitter started successfully");
+            UpdateStatus();
+        }
+        catch (Exception ex)
+        {
+            blockchainRunning = false;
+            LogToBlockchain($"\u274C Failed to start Cardano submitter: {ex.Message}");
+        }
+    }
+
+    private void StopBlockchain()
+    {
+        try
+        {
+            if (blockchainProcess != null)
+            {
+                KillProcessTree(blockchainProcess);
+                blockchainProcess = null;
+            }
+            KillProcessesOnPort(int.Parse(blockchainPort));
+            blockchainRunning = false;
+            LogToBlockchain("\uD83D\uDED1 Cardano submitter stopped");
+            UpdateStatus();
+        }
+        catch (Exception ex)
+        {
+            LogToBlockchain($"\u274C Error stopping Cardano submitter: {ex.Message}");
+        }
     }
 
     #endregion
@@ -317,7 +432,7 @@ public partial class Main : Form
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "python",
+                    FileName = ResolvePythonExecutable(Path.Combine(aiEnginePath, ".venv", "Scripts", "python.exe")),
                     Arguments = $"ai_engine.py --backend-url http://localhost:{backendPort}",
                     WorkingDirectory = aiEnginePath,
                     UseShellExecute = false,
@@ -393,7 +508,7 @@ public partial class Main : Form
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "C:\\Program Files\\nodejs\\npm.cmd",
+                    FileName = ResolveNpmExecutable(),
                     Arguments = "run dev",
                     WorkingDirectory = frontendPath,
                     UseShellExecute = false,
@@ -519,6 +634,7 @@ public partial class Main : Form
 
     private void StopAllProcesses()
     {
+        StopBlockchain();
         StopBackend();
         StopAIEngine();
         StopFrontend();
@@ -528,6 +644,7 @@ public partial class Main : Form
     private void UpdateStatus()
     {
         var running = new List<string>();
+        if (blockchainRunning || (blockchainProcess != null && !blockchainProcess.HasExited)) running.Add("Blockchain");
         if (backendRunning || (backendProcess != null && !backendProcess.HasExited)) running.Add("Backend");
         if (aiEngineRunning || (aiEngineProcess != null && !aiEngineProcess.HasExited)) running.Add("AI Engine");
         if (frontendRunning || (frontendProcess != null && !frontendProcess.HasExited)) running.Add("Frontend");
@@ -540,6 +657,120 @@ public partial class Main : Form
         {
             lblStatus.Text = $"Running: {string.Join(", ", running)}";
         }
+    }
+
+    private string ResolvePythonExecutable(string preferredPythonPath)
+    {
+        if (File.Exists(preferredPythonPath))
+        {
+            return preferredPythonPath;
+        }
+
+        var bundledPython = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".cache",
+            "codex-runtimes",
+            "codex-primary-runtime",
+            "dependencies",
+            "python",
+            "python.exe"
+        );
+
+        var candidates = new[] { bundledPython, "python", "py" };
+        foreach (var candidate in candidates)
+        {
+            if (IsExecutableAvailable(candidate, "--version"))
+            {
+                return candidate;
+            }
+        }
+
+        return "python";
+    }
+
+    private bool IsExecutableAvailable(string executable, string arguments)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null)
+            {
+                return false;
+            }
+
+            if (!proc.WaitForExit(3000))
+            {
+                try { proc.Kill(true); } catch { }
+                return false;
+            }
+
+            return proc.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string ResolveNpmExecutable()
+    {
+        var standardPath = "C:\\Program Files\\nodejs\\npm.cmd";
+        if (File.Exists(standardPath))
+        {
+            return standardPath;
+        }
+
+        if (IsExecutableAvailable("npm.cmd", "--version"))
+        {
+            return "npm.cmd";
+        }
+
+        return standardPath;
+    }
+
+    private void OpenFrontendAfterDelay()
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(6000);
+            try
+            {
+                BeginInvoke(new Action(OpenFrontendInBrowser));
+            }
+            catch { }
+        });
+    }
+
+    private void OpenFrontendInBrowser()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = $"http://localhost:{frontendPort}",
+                UseShellExecute = true
+            });
+            LogToFrontend($"\uD83C\uDF10 Opened dashboard: http://localhost:{frontendPort}");
+        }
+        catch (Exception ex)
+        {
+            LogToFrontend($"\u26A0\uFE0F Could not open browser: {ex.Message}");
+        }
+    }
+
+    private void LogToBlockchain(string message)
+    {
+        LogToBackend($"[BLOCKCHAIN] {message}");
     }
 
     private void LogToBackend(string message)

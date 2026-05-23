@@ -46,8 +46,26 @@ export interface Alert {
   createdAt?: string;
   serverName?: string;
   description?: string;
+  blockchainProof?: BlockchainRecord | null;
   // Legacy/compat
   type?: string;
+}
+
+export interface BlockchainRecord {
+  id: string;
+  tenantId: string;
+  recordType: string;
+  entityId: string;
+  dataHash: string;
+  txHash: string | null;
+  blockHeight: number | null;
+  status: string;
+  network: string;
+  metadataLabel: string;
+  createdAt: string;
+  confirmedAt: string | null;
+  errorMessage: string | null;
+  explorerUrl: string | null;
 }
 
 export interface Notification {

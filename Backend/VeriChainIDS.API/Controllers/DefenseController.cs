@@ -25,6 +25,7 @@ public class DefenseController : ControllerBase
     private readonly ILogger<DefenseController> _logger;
     private readonly IEmailService _emailService;
     private readonly ITelegramService _telegramService;
+    private readonly IBlockchainService _blockchainService;
     private readonly IConfiguration _configuration;
     private readonly IServiceScopeFactory _scopeFactory;
 
@@ -35,6 +36,7 @@ public class DefenseController : ControllerBase
         ILogger<DefenseController> logger,
         IEmailService emailService,
         ITelegramService telegramService,
+        IBlockchainService blockchainService,
         IConfiguration configuration,
         IServiceScopeFactory scopeFactory)
     {
@@ -44,6 +46,7 @@ public class DefenseController : ControllerBase
         _logger = logger;
         _emailService = emailService;
         _telegramService = telegramService;
+        _blockchainService = blockchainService;
         _configuration = configuration;
         _scopeFactory = scopeFactory;
     }
@@ -156,6 +159,7 @@ public class DefenseController : ControllerBase
 
                     await _db.SaveChangesAsync();
                     await tx.CommitAsync();
+                    await RecordBlockEvidenceSafeAsync(existing);
 
                     // Push SignalR (sau commit, lỗi SignalR không làm rollback DB)
                     var blockCmd = new BlockCommandDto
@@ -260,6 +264,7 @@ public class DefenseController : ControllerBase
 
                 await _db.SaveChangesAsync();
                 await tx.CommitAsync();
+                await RecordBlockEvidenceSafeAsync(blockedIP);
 
                 // === Gửi Email + Telegram + Notifications (sau commit — lỗi không ảnh hưởng transaction) ===
                 if (request.AttackType != null)
@@ -323,6 +328,18 @@ public class DefenseController : ControllerBase
                 throw;
             }
         });
+    }
+
+    private async Task RecordBlockEvidenceSafeAsync(BlockedIP blockedIP)
+    {
+        try
+        {
+            await _blockchainService.RecordBlockActionAsync(blockedIP, HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Blockchain recording failed for block {BlockId}", blockedIP.Id);
+        }
     }
 
     /// <summary>Push block command qua SignalR đến Agent Hub và Dashboard.</summary>
@@ -624,6 +641,8 @@ public class DefenseController : ControllerBase
         });
 
         await _db.SaveChangesAsync();
+
+        await RecordBlockEvidenceSafeAsync(blockedIP);
 
         // Push block command to agents
         // If ServerId specified: push only to that server

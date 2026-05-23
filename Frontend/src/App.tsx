@@ -53,6 +53,7 @@ import { ApiGuide } from './components/ApiGuide';
 import { AgentSetupGuide } from './components/AgentSetupGuide';
 import { ApiManagement } from './components/ApiManagement';
 import { Defense } from './components/Defense';
+import { BlockchainVerify } from './components/BlockchainVerify';
 import { Whitelist } from './components/Whitelist';
 import { CheckoutPage } from './components/CheckoutPage';
 import { PaymentResultPage, type DemoPaymentResult } from './components/PaymentResultPage';
@@ -1230,6 +1231,10 @@ export default function App() {
                       servers={servers}
                     />
                   </div>
+                )}
+
+                {activeTab === 'blockchain' && (
+                  <BlockchainVerify theme={theme} />
                 )}
 
                 {activeTab === 'whitelist' && (
