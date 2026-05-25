@@ -233,7 +233,7 @@ public class VeriChainIDSDbContext : DbContext
             e.HasOne(s => s.BlockchainRecord)
                 .WithMany(r => r.EvidenceSnapshots)
                 .HasForeignKey(s => s.BlockchainRecordId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         // Notification

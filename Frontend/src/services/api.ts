@@ -902,6 +902,13 @@ export interface IpReputationResult {
   isGloballyBlocked: boolean;
 }
 
+export interface ThreatIntelReportResult {
+  ipHash: string;
+  txHash: string | null;
+  explorerUrl: string | null;
+  record: BlockchainRecord;
+}
+
 export interface BlockchainHealth {
   network: string;
   submissionMode: string;
@@ -948,6 +955,63 @@ export interface BlockchainProofReport {
   snapshot: EvidenceSnapshot | null;
 }
 
+export interface BlockchainIntegrityChange {
+  field: string;
+  changeType: 'Added' | 'Removed' | 'Modified' | 'InvalidSnapshot' | string;
+  oldValue: string | null;
+  newValue: string | null;
+}
+
+export interface BlockchainIntegrityReport {
+  recordId: string;
+  recordType: string;
+  entityId: string;
+  dataHash: string;
+  txHash: string | null;
+  onChainHash: string | null;
+  snapshotHash: string | null;
+  snapshotContentHash: string | null;
+  currentHash: string | null;
+  snapshotAvailable: boolean;
+  currentDataAvailable: boolean;
+  snapshotHashMatchesStoredHash: boolean;
+  snapshotContentMatchesStoredHash: boolean;
+  currentHashMatchesStoredHash: boolean;
+  storedHashMatchesOnChain: boolean | null;
+  snapshotContentMatchesOnChain: boolean | null;
+  currentHashMatchesOnChain: boolean | null;
+  isTampered: boolean;
+  verdict: string;
+  changes: BlockchainIntegrityChange[];
+}
+
+export interface CustodyEvent {
+  sequence: number;
+  eventType: string;
+  actor: string;
+  entityType: string;
+  entityId: string;
+  timestamp: string;
+  summary: string;
+  previousHash: string;
+  stepHash: string;
+}
+
+export interface IncidentCustodyReport {
+  ticketId: string;
+  alertId: string | null;
+  tenantId: string;
+  ticketNumber: string;
+  status: string;
+  finalChainHash: string;
+  evidenceHash: string;
+  eventCount: number;
+  startedAt: string;
+  closedAt: string | null;
+  events: CustodyEvent[];
+  blockchainProof: BlockchainRecord | null;
+}
+
 export const BlockchainApi = {
   getRecords: async (page = 1, pageSize = 20, filters?: { recordType?: string; status?: string }) => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
@@ -992,12 +1056,24 @@ export const BlockchainApi = {
     return request<BlockchainProofReport>(`/api/blockchain/records/${recordId}/proof-report`);
   },
 
+  getIntegrityReport: async (recordId: string) => {
+    return request<BlockchainIntegrityReport>(`/api/blockchain/records/${recordId}/integrity`);
+  },
+
+  getTicketCustody: async (ticketId: string) => {
+    return request<IncidentCustodyReport>(`/api/blockchain/custody/tickets/${ticketId}`);
+  },
+
+  anchorTicketCustody: async (ticketId: string) => {
+    return request<BlockchainRecord>(`/api/blockchain/custody/tickets/${ticketId}/anchor`, undefined, { method: 'POST' });
+  },
+
   getIpReputation: async (ipAddress: string) => {
     return request<IpReputationResult>(`/api/blockchain/ip-reputation/${encodeURIComponent(ipAddress)}`);
   },
 
   reportIp: async (ipAddress: string, attackType?: string, severity?: string) => {
-    return request('/api/blockchain/report-ip', { ipAddress, attackType, severity }, { method: 'POST' });
+    return request<ThreatIntelReportResult>('/api/blockchain/report-ip', { ipAddress, attackType, severity }, { method: 'POST' });
   },
 };
 

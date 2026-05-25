@@ -478,6 +478,63 @@ public record BlockchainProofReportDto(
     EvidenceSnapshotDto? Snapshot
 );
 
+public record BlockchainIntegrityChangeDto(
+    string Field,
+    string ChangeType,
+    string? OldValue,
+    string? NewValue
+);
+
+public record BlockchainIntegrityReportDto(
+    Guid RecordId,
+    string RecordType,
+    string EntityId,
+    string DataHash,
+    string? TxHash,
+    string? OnChainHash,
+    string? SnapshotHash,
+    string? SnapshotContentHash,
+    string? CurrentHash,
+    bool SnapshotAvailable,
+    bool CurrentDataAvailable,
+    bool SnapshotHashMatchesStoredHash,
+    bool SnapshotContentMatchesStoredHash,
+    bool CurrentHashMatchesStoredHash,
+    bool? StoredHashMatchesOnChain,
+    bool? SnapshotContentMatchesOnChain,
+    bool? CurrentHashMatchesOnChain,
+    bool IsTampered,
+    string Verdict,
+    IReadOnlyList<BlockchainIntegrityChangeDto> Changes
+);
+
+public record CustodyEventDto(
+    int Sequence,
+    string EventType,
+    string Actor,
+    string EntityType,
+    string EntityId,
+    DateTime Timestamp,
+    string Summary,
+    string PreviousHash,
+    string StepHash
+);
+
+public record IncidentCustodyReportDto(
+    Guid TicketId,
+    Guid? AlertId,
+    Guid TenantId,
+    string TicketNumber,
+    string Status,
+    string FinalChainHash,
+    string EvidenceHash,
+    int EventCount,
+    DateTime StartedAt,
+    DateTime? ClosedAt,
+    IReadOnlyList<CustodyEventDto> Events,
+    BlockchainRecordDto? BlockchainProof
+);
+
 public record BlockchainAnchorAlertRequest(
     [Required] Guid AlertId
 );

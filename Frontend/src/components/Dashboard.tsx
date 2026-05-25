@@ -201,7 +201,7 @@ export const Dashboard = memo(({
             </div>
             <div className="h-[300px]">
               {chartTrafficData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={300} minWidth={0} minHeight={300}>
                   <AreaChart data={chartTrafficData}>
                     <defs>
                       <linearGradient id="colorReq" x1="0" y1="0" x2="0" y2="1">
@@ -246,7 +246,7 @@ export const Dashboard = memo(({
             {attackTypes.length > 0 ? (
               <>
                 <div className="h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={250} minWidth={0} minHeight={250}>
                     <PieChart>
                       <Pie
                         data={attackTypes}

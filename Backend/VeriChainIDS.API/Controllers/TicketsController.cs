@@ -19,17 +19,20 @@ public class TicketsController : ControllerBase
     private readonly VeriChainIDSDbContext _db;
     private readonly IHubContext<AlertHub, IAlertHub> _hub;
     private readonly IEmailService _emailService;
+    private readonly IBlockchainService _blockchainService;
     private readonly ILogger<TicketsController> _logger;
 
     public TicketsController(
         VeriChainIDSDbContext db,
         IHubContext<AlertHub, IAlertHub> hub,
         IEmailService emailService,
+        IBlockchainService blockchainService,
         ILogger<TicketsController> logger)
     {
         _db = db;
         _hub = hub;
         _emailService = emailService;
+        _blockchainService = blockchainService;
         _logger = logger;
     }
 
@@ -381,6 +384,18 @@ public class TicketsController : ControllerBase
         await _hub.Clients.Group(ticket.TenantId.ToString()).NotificationReceived(notifDto);
 
         await _db.SaveChangesAsync();
+
+        if (request.Status == "CLOSED")
+        {
+            try
+            {
+                await _blockchainService.RecordIncidentCustodyChainAsync(ticket.Id, HttpContext.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Incident custody chain anchoring failed for ticket {TicketId}", ticket.Id);
+            }
+        }
 
         return Ok(new ApiResponse<TicketDto>(true, $"Ticket status updated to {request.Status}", dto));
     }

@@ -331,7 +331,7 @@ BEGIN
         SnapshotJson NVARCHAR(MAX) NOT NULL,
         CreatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
         CONSTRAINT FK_EvidenceSnapshots_Tenants_TenantId FOREIGN KEY (TenantId) REFERENCES Tenants(Id) ON DELETE CASCADE,
-        CONSTRAINT FK_EvidenceSnapshots_BlockchainRecords_BlockchainRecordId FOREIGN KEY (BlockchainRecordId) REFERENCES BlockchainRecords(Id) ON DELETE SET NULL
+        CONSTRAINT FK_EvidenceSnapshots_BlockchainRecords_BlockchainRecordId FOREIGN KEY (BlockchainRecordId) REFERENCES BlockchainRecords(Id) ON DELETE NO ACTION
     );
 END;
 ELSE

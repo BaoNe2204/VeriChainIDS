@@ -223,6 +223,53 @@ public class BlockchainController : ControllerBase
         return Ok(new ApiResponse<BlockchainProofReportDto>(true, "OK", report));
     }
 
+    [HttpGet("records/{recordId:guid}/integrity")]
+    public async Task<ActionResult<ApiResponse<BlockchainIntegrityReportDto>>> GetIntegrityReport(Guid recordId)
+    {
+        var record = await _db.BlockchainRecords.AsNoTracking().FirstOrDefaultAsync(r => r.Id == recordId);
+        if (record == null)
+            return NotFound(new ApiResponse<BlockchainIntegrityReportDto>(false, "Blockchain record not found.", null));
+        if (!CanAccessTenant(record.TenantId))
+            return Forbid();
+
+        var report = await _blockchainService.BuildIntegrityReportAsync(recordId, HttpContext.RequestAborted);
+        return Ok(new ApiResponse<BlockchainIntegrityReportDto>(true, "OK", report));
+    }
+
+    [HttpGet("custody/tickets/{ticketId:guid}")]
+    public async Task<ActionResult<ApiResponse<IncidentCustodyReportDto>>> GetTicketCustody(Guid ticketId)
+    {
+        var ticket = await _db.Tickets.AsNoTracking().FirstOrDefaultAsync(t => t.Id == ticketId);
+        if (ticket == null)
+            return NotFound(new ApiResponse<IncidentCustodyReportDto>(false, "Ticket not found.", null));
+        if (!CanAccessTenant(ticket.TenantId))
+            return Forbid();
+
+        var report = await _blockchainService.BuildIncidentCustodyChainAsync(ticketId, HttpContext.RequestAborted);
+        return Ok(new ApiResponse<IncidentCustodyReportDto>(true, "OK", report));
+    }
+
+    [HttpPost("custody/tickets/{ticketId:guid}/anchor")]
+    public async Task<ActionResult<ApiResponse<BlockchainRecordDto>>> AnchorTicketCustody(Guid ticketId)
+    {
+        var ticket = await _db.Tickets.AsNoTracking().FirstOrDefaultAsync(t => t.Id == ticketId);
+        if (ticket == null)
+            return NotFound(new ApiResponse<BlockchainRecordDto>(false, "Ticket not found.", null));
+        if (!CanAccessTenant(ticket.TenantId))
+            return Forbid();
+
+        try
+        {
+            var record = await _blockchainService.RecordIncidentCustodyChainAsync(ticketId, HttpContext.RequestAborted);
+            return Ok(new ApiResponse<BlockchainRecordDto>(true, "Incident custody chain anchored.", MapRecordDto(record)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Incident custody anchoring failed for ticket {TicketId}", ticketId);
+            return StatusCode(500, new ApiResponse<BlockchainRecordDto>(false, "Incident custody anchoring failed.", null));
+        }
+    }
+
     [HttpGet("ip-reputation/{ipAddress}")]
     public async Task<ActionResult<ApiResponse<IpReputationResult>>> GetIpReputation(string ipAddress)
     {
@@ -233,7 +280,19 @@ public class BlockchainController : ControllerBase
     [HttpPost("report-ip")]
     public async Task<ActionResult<ApiResponse<object>>> ReportIp([FromBody] ReportMaliciousIpRequest request)
     {
-        var txHash = await _blockchainService.ReportMaliciousIpAsync(
+        var tenantId = GetTenantId();
+        if (!tenantId.HasValue)
+        {
+            tenantId = await _db.Tenants
+                .AsNoTracking()
+                .Select(t => t.Id)
+                .FirstOrDefaultAsync(HttpContext.RequestAborted);
+            if (tenantId == Guid.Empty)
+                return BadRequest(new ApiResponse<object>(false, "TenantId is required to report threat intelligence.", null));
+        }
+
+        var record = await _blockchainService.ReportMaliciousIpAsync(
+            tenantId.Value,
             request.IpAddress,
             request.AttackType ?? "Unknown",
             request.Severity ?? "Medium",
@@ -242,8 +301,9 @@ public class BlockchainController : ControllerBase
         return Ok(new ApiResponse<object>(true, "IP reputation report submitted.", new
         {
             ipHash = _blockchainService.ComputeIpHash(request.IpAddress),
-            txHash,
-            explorerUrl = _blockchainService.GetExplorerUrl(txHash)
+            txHash = record.TxHash,
+            explorerUrl = _blockchainService.GetExplorerUrl(record.TxHash, record.Network),
+            record = MapRecordDto(record)
         }));
     }
 

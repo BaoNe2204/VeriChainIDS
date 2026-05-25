@@ -67,6 +67,22 @@ import { TicketManagement } from './components/TicketManagement';
 import { NotificationCenter } from './components/NotificationCenter';
 import { ServerSettings } from './components/ServerSettings';
 
+const demoTabLinks = new Set([
+  'dashboard',
+  'incidents',
+  'defense',
+  'blockchain',
+  'ai',
+  'reports',
+  'tickets',
+  'settings',
+]);
+
+function getInitialTabFromUrl() {
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  return tab && demoTabLinks.has(tab) ? tab : 'dashboard';
+}
+
 export default function App() {
   const { processDashboardData } = useDataWorker();
   const { fetchDashboard, fetchMultiple, isReady: workerReady } = useFetchWorker();
@@ -80,7 +96,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(getInitialTabFromUrl);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAlertVisible, setIsAlertVisible] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ExternalLink, FileDown, Link2, Search, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Theme } from '../types';
@@ -15,15 +15,14 @@ export const PublicBlockchainVerify = ({ theme }: PublicBlockchainVerifyProps) =
   const [result, setResult] = useState<BlockchainVerifyResult | null>(null);
   const [error, setError] = useState('');
 
-  const verify = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!txHash.trim() || !expectedHash.trim()) return;
+  const runVerify = useCallback(async (tx: string, hash: string) => {
+    if (!tx.trim() || !hash.trim()) return;
 
     setLoading(true);
     setResult(null);
     setError('');
     try {
-      const res = await BlockchainApi.verifyPublic(txHash.trim(), expectedHash.trim());
+      const res = await BlockchainApi.verifyPublic(tx.trim(), hash.trim());
       if (res.success && res.data) {
         setResult(res.data);
       } else {
@@ -32,6 +31,22 @@ export const PublicBlockchainVerify = ({ theme }: PublicBlockchainVerifyProps) =
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tx = params.get('txHash') || params.get('tx') || '';
+    const hash = params.get('hash') || params.get('evidenceHash') || params.get('expectedHash') || '';
+    if (!tx || !hash) return;
+
+    setTxHash(tx);
+    setExpectedHash(hash);
+    runVerify(tx, hash);
+  }, [runVerify]);
+
+  const verify = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await runVerify(txHash, expectedHash);
   };
 
   const downloadProof = () => {

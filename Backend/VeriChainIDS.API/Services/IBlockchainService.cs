@@ -12,6 +12,8 @@ public interface IBlockchainService
     Task<BlockchainRecord> RecordAlertAsync(Alert alert, CancellationToken cancellationToken = default);
     Task<BlockchainRecord> RecordBlockActionAsync(BlockedIP blockedIp, CancellationToken cancellationToken = default);
     Task<BlockchainRecord> RecordAuditLogAsync(AuditLog auditLog, CancellationToken cancellationToken = default);
+    Task<IncidentCustodyReportDto?> BuildIncidentCustodyChainAsync(Guid ticketId, CancellationToken cancellationToken = default);
+    Task<BlockchainRecord> RecordIncidentCustodyChainAsync(Guid ticketId, CancellationToken cancellationToken = default);
 
     Task<string?> GetOnChainHashAsync(string txHash, CancellationToken cancellationToken = default);
     Task<CardanoTransactionStatus> GetTransactionStatusAsync(string txHash, CancellationToken cancellationToken = default);
@@ -19,6 +21,7 @@ public interface IBlockchainService
     Task<BlockchainRecord> RetryRecordAsync(Guid recordId, CancellationToken cancellationToken = default);
     Task<BlockchainHealthDto> GetHealthAsync(CancellationToken cancellationToken = default);
     Task<BlockchainProofReportDto?> BuildProofReportAsync(Guid recordId, CancellationToken cancellationToken = default);
+    Task<BlockchainIntegrityReportDto?> BuildIntegrityReportAsync(Guid recordId, CancellationToken cancellationToken = default);
     Task<IpReputationResult> QueryIpReputationAsync(string ipAddress, CancellationToken cancellationToken = default);
-    Task<string?> ReportMaliciousIpAsync(string ipAddress, string attackType, string severity, CancellationToken cancellationToken = default);
+    Task<BlockchainRecord> ReportMaliciousIpAsync(Guid tenantId, string ipAddress, string attackType, string severity, CancellationToken cancellationToken = default);
 }
