@@ -340,14 +340,16 @@ public class BlockchainController : ControllerBase
             if (!enforceTenant && !local.Network.Contains("demo", StringComparison.OrdinalIgnoreCase) && local.Status != "Confirmed")
             {
                 return Ok(new ApiResponse<BlockchainVerifyResponse>(true, "OK", new BlockchainVerifyResponse(
-                    false,
+                    localMatch,
                     txHash,
                     expectedHash,
                     local.DataHash,
                     $"Local evidence record ({local.Status})",
                     local.Status == "Failed"
                         ? $"Blockchain transaction failed: {local.ErrorMessage ?? "unknown error"}"
-                        : "Blockchain transaction is still pending confirmation.",
+                        : localMatch
+                            ? "Expected hash matches local evidence. Cardano confirmation is still pending."
+                            : "Expected hash does not match stored evidence hash.",
                     _blockchainService.GetExplorerUrl(local.TxHash, local.Network)
                 )));
             }

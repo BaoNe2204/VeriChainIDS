@@ -409,9 +409,16 @@ public class CardanoBlockchainService : IBlockchainService
         else
         {
             var onChainHash = await GetOnChainHashAsync(record.TxHash, cancellationToken);
-            verifyResult = string.Equals(onChainHash, record.DataHash, StringComparison.OrdinalIgnoreCase);
+            var localSnapshotMatch = snapshot == null || string.Equals(snapshot.SnapshotHash, record.DataHash, StringComparison.OrdinalIgnoreCase);
+            verifyResult = onChainHash == null && record.Status != "Confirmed"
+                ? localSnapshotMatch
+                : string.Equals(onChainHash, record.DataHash, StringComparison.OrdinalIgnoreCase);
             verifyMessage = onChainHash == null
-                ? "No VeriChainIDS metadata hash was found on Cardano."
+                ? record.Status == "Confirmed"
+                    ? "No VeriChainIDS metadata hash was found on Cardano."
+                    : localSnapshotMatch
+                        ? "Local evidence hash matches. Cardano confirmation is still pending."
+                        : "Snapshot hash does not match the stored evidence hash."
                 : verifyResult == true
                     ? "Cardano metadata hash matches the stored evidence hash."
                     : "Cardano metadata hash does not match the stored evidence hash.";

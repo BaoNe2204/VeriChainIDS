@@ -356,7 +356,7 @@ public partial class Main : Form
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "dotnet",
-                    Arguments = "run",
+                    Arguments = $"run --urls http://0.0.0.0:{backendPort}",
                     WorkingDirectory = backendPath,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
@@ -365,6 +365,17 @@ public partial class Main : Form
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8
                 }
+            };
+            backendProcess.EnableRaisingEvents = true;
+            backendProcess.Exited += (s, e) =>
+            {
+                var exitCode = backendProcess?.ExitCode;
+                BeginInvoke(new Action(() =>
+                {
+                    LogToBackend($"[EXIT] Backend stopped unexpectedly. ExitCode={exitCode}");
+                    backendRunning = false;
+                    UpdateStatus();
+                }));
             };
 
             backendProcess.OutputDataReceived += (s, e) =>
