@@ -13,8 +13,15 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [1/6] pip install pyinstaller + requirements...
+python -m pip install --upgrade pyinstaller >nul 2>&1
+python -m pip install -r requirements.txt >nul 2>&1
+if errorlevel 1 (
+    python -m pip install requests psutil pystray pillow signalrcore websocket-client pydivert >nul 2>&1
+)
+
 REM === Tìm thư mục pydivert ===
-echo [1/6] Locating pydivert package...
+echo [2/6] Locating pydivert package...
 for /f "delims=" %%i in ('python -c "import pydivert,os; print(os.path.dirname(pydivert.__file__))" 2^>nul') do set PYDIVERT_DIR=%%i
 set PYDIVERT_DIR=%PYDIVERT_DIR%\windivert_dll
 
@@ -34,15 +41,8 @@ if "%WD_SYS%"=="" (
     echo [WARN] WinDivert64.sys not found in %PYDIVERT_DIR%
 )
 
-echo [2/6] pip install pyinstaller + requirements...
-python -m pip install --upgrade pyinstaller >nul 2>&1
-python -m pip install -r requirements.txt >nul 2>&1
-if errorlevel 1 (
-    python -m pip install requests psutil pystray pillow signalrcore websocket-client pydivert >nul 2>&1
-)
-
 echo [3/6] Stop running exe (if any)...
-taskkill /F /IM VeriChainIDSAgent.exe >nul 2>&1
+taskkill /F /IM VeriChainIDS.exe >nul 2>&1
 taskkill /F /IM VeriChainIDSDebug.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
@@ -92,18 +92,18 @@ if "%COPY_OK%"=="0" (
 )
 
 REM === [7/7] Tạo file ZIP chứa Agent + Driver (Sửa lỗi !ZIP_FILES!) ===
-echo [7/7] Packaging VeriChainIDSAgent.zip...
-if exist "dist\VeriChainIDSAgent.zip" del /f /q "dist\VeriChainIDSAgent.zip" >nul 2>&1
+echo [7/7] Packaging VeriChainIDS.zip...
+if exist "dist\VeriChainIDS.zip" del /f /q "dist\VeriChainIDS.zip" >nul 2>&1
 
-set "Z_AGENT=dist\VeriChainIDSAgent.exe"
+set "Z_AGENT=dist\VeriChainIDS.exe"
 set "Z_DEBUG=dist\VeriChainIDSDebug.exe"
 set "Z_DLL=dist\WinDivert64.dll"
 set "Z_SYS=dist\WinDivert64.sys"
 
-powershell -NoProfile -Command "$files = @('%Z_AGENT%', '%Z_DEBUG%', '%Z_DLL%', '%Z_SYS%') | Where-Object { Test-Path $_ }; if ($files) { Compress-Archive -Path $files -DestinationPath 'dist\VeriChainIDSAgent.zip' -Force; exit 0 } else { exit 1 }"
+powershell -NoProfile -Command "$files = @('%Z_AGENT%', '%Z_DEBUG%', '%Z_DLL%', '%Z_SYS%') | Where-Object { Test-Path $_ }; if ($files) { Compress-Archive -Path $files -DestinationPath 'dist\VeriChainIDS.zip' -Force; exit 0 } else { exit 1 }"
 
 if not errorlevel 1 (
-    for %%A in ("dist\VeriChainIDSAgent.zip") do echo    [OK] VeriChainIDSAgent.zip  %%~zA bytes
+    for %%A in ("dist\VeriChainIDS.zip") do echo    [OK] VeriChainIDS.zip  %%~zA bytes
 ) else (
     echo    [FAIL] Zip packaging failed - No files found
 )
@@ -113,8 +113,8 @@ echo ============================================================
 echo   Build Complete
 echo ============================================================
 echo.
-if exist "dist\VeriChainIDSAgent.exe" (
-    for %%A in ("dist\VeriChainIDSAgent.exe") do echo  [OK] dist\VeriChainIDSAgent.exe     %%~zA bytes
+if exist "dist\VeriChainIDS.exe" (
+    for %%A in ("dist\VeriChainIDS.exe") do echo  [OK] dist\VeriChainIDS.exe     %%~zA bytes
 )
 if exist "dist\VeriChainIDSDebug.exe" (
     for %%A in ("dist\VeriChainIDSDebug.exe") do echo  [OK] dist\VeriChainIDSDebug.exe     %%~zA bytes
@@ -125,8 +125,8 @@ if exist "dist\WinDivert64.dll" (
 if exist "dist\WinDivert64.sys" (
     for %%A in ("dist\WinDivert64.sys") do echo  [OK] dist\WinDivert64.sys       %%~zA bytes
 )
-if exist "dist\VeriChainIDSAgent.zip" (
-    for %%A in ("dist\VeriChainIDSAgent.zip") do echo  [OK] dist\VeriChainIDSAgent.zip     %%~zA bytes
+if exist "dist\VeriChainIDS.zip" (
+    for %%A in ("dist\VeriChainIDS.zip") do echo  [OK] dist\VeriChainIDS.zip     %%~zA bytes
 )
 echo.
 pause

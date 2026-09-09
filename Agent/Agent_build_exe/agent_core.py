@@ -597,10 +597,16 @@ class IPBlocker:
             return False
 
     def _unblock_local(self, ip: str) -> bool:
-        rule = f"VeriChainIDS_Block_{ip.replace('.', '_')}"
+        rule_agent = f"VeriChainIDS_Block_{ip.replace('.', '_')}"
+        rule_ai = f"VeriChainIDS_AI_v3_{ip.replace('.', '_')}"
         cf = 0x08000000 if self._plat == "Windows" else 0
         if self._plat == "Windows":
-            cmd = ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule}"]
+            cmd = ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_agent}"]
+            cmd_ai = ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_ai}"]
+            try:
+                subprocess.run(cmd_ai, capture_output=True, text=True, timeout=10, creationflags=cf)
+            except Exception:
+                pass
         else:
             cmd = ["iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"]
         try:

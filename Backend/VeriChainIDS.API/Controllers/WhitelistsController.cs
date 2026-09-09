@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace VeriChainIDS.API.Controllers;
 
@@ -21,19 +22,22 @@ public class WhitelistsController : ControllerBase
     private readonly IHubContext<AlertHub, IAlertHub> _alertHub;
     private readonly ITelegramService _telegramService;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _memoryCache;
 
     public WhitelistsController(
         VeriChainIDSDbContext db,
         ILogger<WhitelistsController> logger,
         IHubContext<AlertHub, IAlertHub> alertHub,
         ITelegramService telegramService,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache memoryCache)
     {
         _db = db;
         _logger = logger;
         _alertHub = alertHub;
         _telegramService = telegramService;
         _scopeFactory = scopeFactory;
+        _memoryCache = memoryCache;
     }
 
     /// <summary>Lấy danh sách Whitelist, hỗ trợ lọc theo ServerId</summary>
@@ -300,6 +304,13 @@ public class WhitelistsController : ControllerBase
     {
         var tenantId = GetTenantId();
 
+        // Ưu tiên kiểm tra Temporary Whitelist (Cooldown) từ MemoryCache trước
+        if (_memoryCache.TryGetValue($"TempWhitelist_{ip}", out _))
+        {
+            _logger.LogInformation("[WHITELIST-CHECK] IP={IP} is in Temp Whitelist (Cooldown)", ip);
+            return Ok(new ApiResponse<object>(true, "Whitelisted (Cooldown)", new { ip, isWhitelisted = true }));
+        }
+
         var exists = await _db.Whitelists
             .AnyAsync(w =>
                 w.IpAddress == ip &&
@@ -320,6 +331,13 @@ public class WhitelistsController : ControllerBase
         if (!Request.Headers.TryGetValue("X-API-Key", out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
         {
             return Unauthorized(new ApiResponse<object>(false, "API Key required", null));
+        }
+
+        // Ưu tiên kiểm tra Temporary Whitelist (Cooldown) từ MemoryCache trước
+        if (_memoryCache.TryGetValue($"TempWhitelist_{ip}", out _))
+        {
+            _logger.LogInformation("[AI-WHITELIST] IP={IP} is in Temp Whitelist (Cooldown)", ip);
+            return Ok(new ApiResponse<object>(true, "Whitelisted (Cooldown)", new { ip, serverId, isWhitelisted = true }));
         }
 
         // Check whitelist across all tenants

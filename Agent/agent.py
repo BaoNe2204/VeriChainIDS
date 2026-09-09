@@ -324,7 +324,13 @@ except Exception:
         def _unblock_local(self, ip: str) -> bool:
             if self._platform == "Windows":
                 rule_name = f"VeriChainIDS_Block_{ip.replace('.', '_')}"
+                rule_ai = f"VeriChainIDS_AI_v3_{ip.replace('.', '_')}"
                 cmd = ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name}"]
+                cmd_ai = ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_ai}"]
+                try:
+                    subprocess.run(cmd_ai, capture_output=True, text=True, timeout=10)
+                except Exception:
+                    pass
             else:
                 cmd = ["iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"]
             try:

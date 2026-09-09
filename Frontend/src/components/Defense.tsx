@@ -65,6 +65,13 @@ export const Defense = ({
   const [checkLoading, setCheckLoading] = useState(false);
   const [unblocking, setUnblocking] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+  const [confirmUnblockIP, setConfirmUnblockIP] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const isStaff = userRole === 'Staff';
 
@@ -79,6 +86,9 @@ export const Defense = ({
       ip.ipAddress.includes(searchQuery) ||
       ip.attackType?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredIPs.length / itemsPerPage);
+  const paginatedIPs = filteredIPs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const stats = {
     total: blockedIPs.length,
@@ -131,9 +141,14 @@ export const Defense = ({
     setCheckLoading(false);
   };
 
-  const handleUnblock = async (ip: string) => {
-    if (!confirm(`Bạn có chắc muốn bỏ chặn IP ${ip}?`)) return;
-    
+  const handleUnblockRequest = (ip: string) => {
+    setConfirmUnblockIP(ip);
+  };
+
+  const handleConfirmUnblock = async () => {
+    if (!confirmUnblockIP) return;
+    const ip = confirmUnblockIP;
+    setConfirmUnblockIP(null);
     setUnblocking(ip);
     try {
       const success = await onUnblock(ip);
@@ -340,7 +355,7 @@ export const Defense = ({
                 </tr>
               </thead>
               <tbody className={cn("divide-y", theme === 'dark' ? 'divide-slate-700' : 'divide-slate-100')}>
-                {filteredIPs.map((ip) => (
+                {paginatedIPs.map((ip) => (
                   <tr
                     key={ip.id}
                     className={cn(
@@ -405,7 +420,7 @@ export const Defense = ({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => handleUnblock(ip.ipAddress)}
+                        onClick={() => handleUnblockRequest(ip.ipAddress)}
                         disabled={unblocking === ip.ipAddress}
                         className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium bg-green-600/20 text-green-400 border border-green-500/30 hover:bg-green-600/30 transition-all disabled:opacity-50"
                       >
@@ -421,6 +436,30 @@ export const Defense = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-inherit flex items-center justify-between">
+            <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-slate-400' : 'text-slate-500')}>
+              Trang {currentPage} / {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={cn("px-4 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-50 transition-all", theme === 'dark' ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600")}
+              >
+                Trước
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className={cn("px-4 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-50 transition-all", theme === 'dark' ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600")}
+              >
+                Sau
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -591,6 +630,42 @@ export const Defense = ({
               >
                 {blockLoading ? <RefreshCw size={16} className="animate-spin" /> : <Ban size={16} />}
                 Block IP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmUnblockIP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className={cn(
+            "w-full max-w-sm rounded-2xl border p-6 shadow-2xl animate-in zoom-in-95",
+            theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+          )}>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
+              <Unlock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className={cn("text-lg font-bold text-center mb-2", theme === 'dark' ? 'text-white' : 'text-slate-900')}>
+              Xác nhận bỏ chặn
+            </h3>
+            <p className={cn("text-sm text-center mb-6", theme === 'dark' ? 'text-slate-400' : 'text-slate-500')}>
+              Bạn có chắc chắn muốn bỏ chặn cho địa chỉ IP <br/>
+              <span className={cn("font-mono font-bold text-base mt-2 inline-block px-2 py-1 rounded", theme === 'dark' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-800')}>{confirmUnblockIP}</span> ?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmUnblockIP(null)}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-lg font-medium transition-all",
+                  theme === 'dark' ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                )}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmUnblock}
+                className="flex-1 px-4 py-2 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-lg shadow-blue-500/30"
+              >
+                Đồng ý
               </button>
             </div>
           </div>

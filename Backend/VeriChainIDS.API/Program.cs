@@ -36,6 +36,7 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddSignalR();
+builder.Services.AddMemoryCache();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

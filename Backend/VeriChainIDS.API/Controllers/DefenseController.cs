@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace VeriChainIDS.API.Controllers;
 
@@ -28,6 +29,7 @@ public class DefenseController : ControllerBase
     private readonly IBlockchainService _blockchainService;
     private readonly IConfiguration _configuration;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IMemoryCache _memoryCache;
 
     public DefenseController(
         VeriChainIDSDbContext db,
@@ -38,7 +40,8 @@ public class DefenseController : ControllerBase
         ITelegramService telegramService,
         IBlockchainService blockchainService,
         IConfiguration configuration,
-        IServiceScopeFactory scopeFactory)
+        IServiceScopeFactory scopeFactory,
+        IMemoryCache memoryCache)
     {
         _db = db;
         _alertHub = alertHub;
@@ -49,6 +52,7 @@ public class DefenseController : ControllerBase
         _blockchainService = blockchainService;
         _configuration = configuration;
         _scopeFactory = scopeFactory;
+        _memoryCache = memoryCache;
     }
 
     // ============================================================================
@@ -446,6 +450,11 @@ public class DefenseController : ControllerBase
 
         _logger.LogInformation("[UNBLOCK] IP {Ip} unblocked and removed from database (ServerId={ServerId})",
             request.Ip, request.ServerId);
+
+        // Thêm vào danh sách Whitelist tạm thời (Cooldown) trong 2 phút
+        var cacheKey = $"TempWhitelist_{request.Ip}";
+        _memoryCache.Set(cacheKey, true, TimeSpan.FromMinutes(2));
+        _logger.LogInformation("[UNBLOCK] IP {Ip} added to Temporary Whitelist (Cooldown) for 2 minutes", request.Ip);
 
         return Ok(new ApiResponse<object>(true, $"IP {request.Ip} has been unblocked and removed.", new
         {

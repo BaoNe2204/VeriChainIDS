@@ -451,25 +451,14 @@ public class AlertsController : ControllerBase
         var realtimeUsers = allUsers.Where(u => MeetsSeverityThreshold(alert.Severity, u.AlertSeverityThreshold) && u.AlertDigestMode == "realtime").ToList();
         var digestUsers = allUsers.Where(u => MeetsSeverityThreshold(alert.Severity, u.AlertSeverityThreshold) && u.AlertDigestMode != "realtime").ToList();
 
-        var hasRealtimeRecipients = serverRecipients.Count > 0 || realtimeUsers.Count > 0;
-
-        if (hasRealtimeRecipients)
-        {
-            var sent = await _telegramService.SendAlertAsync(alert.TenantId, alert, server, ticket);
-            _logger.LogInformation("Telegram alert sent. ServerRecipients={ServerCount}, RealtimeUsers={RealtimeCount}, DigestUsers={DigestCount}, SentCount={SentCount}, AlertId={AlertId}",
-                serverRecipients.Count, realtimeUsers.Count, digestUsers.Count, sent, alert.Id);
-        }
+        var sent = await _telegramService.SendAlertAsync(alert.TenantId, alert, server, ticket);
+        _logger.LogInformation("Telegram alert sent. ServerRecipients={ServerCount}, RealtimeUsers={RealtimeCount}, DigestUsers={DigestCount}, SentCount={SentCount}, AlertId={AlertId}",
+            serverRecipients.Count, realtimeUsers.Count, digestUsers.Count, sent, alert.Id);
 
         if (digestUsers.Count > 0)
         {
             await _telegramService.QueueAlertAsync(alert.TenantId, alert, server, ticket);
             _logger.LogInformation("Queued {Count} digest entries for alert {AlertId}", digestUsers.Count, alert.Id);
-        }
-
-        if (!hasRealtimeRecipients && digestUsers.Count == 0)
-        {
-            _logger.LogInformation("No Telegram recipients matched for alert {AlertId}. ServerRecipients={Srv}, RealtimeUsers={RT}, DigestUsers={Dig}",
-                alert.Id, serverRecipients.Count, realtimeUsers.Count, digestUsers.Count);
         }
     }
 

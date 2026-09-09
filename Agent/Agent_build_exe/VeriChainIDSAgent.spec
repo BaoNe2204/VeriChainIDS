@@ -37,7 +37,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='VeriChainIDSAgent',
+    name='VeriChainIDS',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

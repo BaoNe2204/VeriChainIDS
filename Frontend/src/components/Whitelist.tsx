@@ -59,6 +59,13 @@ export const Whitelist = ({
   const [addLoading, setAddLoading] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+  const [confirmRemoveWhitelist, setConfirmRemoveWhitelist] = useState<{id: string, ip: string} | null>(null);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -76,6 +83,9 @@ export const Whitelist = ({
   const displayedWhitelists = selectedServerId
     ? filtered.filter((w) => w.serverId === selectedServerId || w.serverId == null)
     : filtered;
+
+  const totalPages = Math.ceil(displayedWhitelists.length / itemsPerPage);
+  const paginatedWhitelists = displayedWhitelists.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleAdd = async () => {
     if (!addIP.trim()) {
@@ -109,8 +119,14 @@ export const Whitelist = ({
     }
   };
 
-  const handleRemove = async (id: string, ip: string) => {
-    if (!confirm(`Bạn có chắc muốn xóa IP ${ip} khỏi Whitelist?`)) return;
+  const handleRemoveRequest = (id: string, ip: string) => {
+    setConfirmRemoveWhitelist({ id, ip });
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!confirmRemoveWhitelist) return;
+    const { id, ip } = confirmRemoveWhitelist;
+    setConfirmRemoveWhitelist(null);
     setRemoving(id);
     try {
       const ok = await onRemove(id, ip);
@@ -279,7 +295,7 @@ export const Whitelist = ({
                 </tr>
               </thead>
               <tbody className={cn("divide-y", theme === 'dark' ? 'divide-slate-700' : 'divide-slate-100')}>
-                {displayedWhitelists.map((w) => (
+                {paginatedWhitelists.map((w) => (
                   <tr
                     key={w.id}
                     className={cn(
@@ -325,7 +341,7 @@ export const Whitelist = ({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => handleRemove(w.id, w.ipAddress)}
+                        onClick={() => handleRemoveRequest(w.id, w.ipAddress)}
                         disabled={removing === w.id}
                         className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30 transition-all disabled:opacity-50"
                       >
@@ -341,6 +357,30 @@ export const Whitelist = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-inherit flex items-center justify-between">
+            <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-slate-400' : 'text-slate-500')}>
+              Trang {currentPage} / {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={cn("px-4 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-50 transition-all", theme === 'dark' ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600")}
+              >
+                Trước
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className={cn("px-4 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-50 transition-all", theme === 'dark' ? "border-slate-700 hover:bg-slate-800 text-slate-300" : "border-slate-200 hover:bg-slate-50 text-slate-600")}
+              >
+                Sau
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -448,6 +488,44 @@ export const Whitelist = ({
               >
                 {addLoading ? <RefreshCw size={16} className="animate-spin" /> : <Plus size={16} />}
                 Thêm Whitelist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Remove Modal */}
+      {confirmRemoveWhitelist && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className={cn(
+            "w-full max-w-sm rounded-2xl border p-6 shadow-2xl animate-in zoom-in-95",
+            theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+          )}>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/30 mb-4">
+              <Trash2 className="h-6 w-6 text-rose-600 dark:text-rose-400" />
+            </div>
+            <h3 className={cn("text-lg font-bold text-center mb-2", theme === 'dark' ? 'text-white' : 'text-slate-900')}>
+              Xác nhận xóa Whitelist
+            </h3>
+            <p className={cn("text-sm text-center mb-6", theme === 'dark' ? 'text-slate-400' : 'text-slate-500')}>
+              Bạn có chắc chắn muốn xóa địa chỉ IP <br/>
+              <span className={cn("font-mono font-bold text-base mt-2 inline-block px-2 py-1 rounded", theme === 'dark' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-800')}>{confirmRemoveWhitelist.ip}</span> <br/> khỏi Whitelist không?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRemoveWhitelist(null)}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-lg font-medium transition-all",
+                  theme === 'dark' ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                )}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmRemove}
+                className="flex-1 px-4 py-2 rounded-lg font-medium bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-lg shadow-rose-500/30"
+              >
+                Đồng ý
               </button>
             </div>
           </div>
