@@ -125,25 +125,9 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        // Cho phép localhost + mạng LAN (192.168.x) để VM / máy khác mở Frontend bằng IP vẫn gọi được API
+        // Cho phép mọi origin để dễ dàng deploy VPS
         policy
-            .SetIsOriginAllowed(static origin =>
-            {
-                if (string.IsNullOrEmpty(origin)) return false;
-                try
-                {
-                    var uri = new Uri(origin);
-                    var h = uri.Host;
-                    if (h is "localhost" or "127.0.0.1" or "localhost") return true;
-                    if (h.StartsWith("192.168.", StringComparison.Ordinal)) return true;
-                    if (h.StartsWith("10.", StringComparison.Ordinal)) return true;
-                    return false;
-                }
-                catch
-                {
-                    return false;
-                }
-            })
+            .SetIsOriginAllowed(static origin => true)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
