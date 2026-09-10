@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Server, Filter, X } from 'lucide-react';
+import { Server, Filter, X, AlertTriangle } from 'lucide-react';
 import { cn } from './lib/utils';
 import { useDataWorker, useFetchWorker } from './hooks/useDataWorker';
 
@@ -945,8 +945,51 @@ export default function App() {
     );
   }
 
+  const latestAlert = alerts?.[0] || null;
+
   return (
     <div className={cn("min-h-screen transition-colors duration-300", theme === 'dark' ? "bg-[#020617] text-slate-200" : "bg-slate-50 text-slate-800", "font-sans selection:bg-blue-500/30")}>
+      {/* Real-time Alert Popup (Global) */}
+      <AnimatePresence>
+        {isAlertVisible && latestAlert && (
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 50 }}
+            className={cn(
+              "fixed bottom-8 right-8 z-50 p-6 rounded-2xl border shadow-2xl flex items-center gap-6 max-w-md transition-colors",
+              theme === 'dark' ? "bg-slate-900 border-rose-500/50" : "bg-white border-rose-200"
+            )}
+          >
+            <div className="bg-rose-500 p-3 rounded-xl animate-pulse">
+              <AlertTriangle className="text-white" size={24} />
+            </div>
+            <div className="flex-1">
+              <h4 className={cn("font-bold text-rose-500 uppercase tracking-widest text-xs mb-1")}>
+                {t.criticalThreat || 'Cảnh Báo Mới'}
+              </h4>
+              <p className={cn("text-sm font-medium", theme === 'dark' ? "text-white" : "text-slate-900")}>
+                {latestAlert.title || latestAlert.message || latestAlert.alertType || 'Phát hiện mối đe dọa mới'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {latestAlert.serverName || latestAlert.targetAsset || latestAlert.sourceIp || '—'}
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => { setIsAlertVisible(false); setActiveTab('incidents'); }}
+                  className="bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold px-4 py-2 rounded-lg transition-colors"
+                >
+                  {t.activateSoar || 'Xem Chi Tiết'}
+                </button>
+                <button onClick={() => setIsAlertVisible(false)} className={cn("text-[10px] font-bold px-4 py-2 rounded-lg border transition-colors", theme === 'dark' ? "border-slate-800 text-slate-400 hover:bg-slate-800" : "border-slate-200 text-slate-500 hover:bg-slate-100")}>
+                  {t.cancel || 'Đóng'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Modals
         theme={theme}
         t={t}

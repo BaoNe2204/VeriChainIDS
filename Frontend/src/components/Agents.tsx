@@ -33,6 +33,7 @@ export const Agents = ({
 }: AgentsProps) => {
   const [downloadStatus, setDownloadStatus] = useState<AgentStatus | null>(null);
   const [showBuildModal, setShowBuildModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, name: string } | null>(null);
 
   // Kiểm tra trạng thái Agent khi component mount (để hiện badge)
   useEffect(() => {
@@ -166,6 +167,51 @@ export const Agents = ({
         </div>
       )}
 
+      {/* Delete Confirm Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className={cn(
+            "w-full max-w-sm rounded-2xl border p-6 shadow-2xl",
+            theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+          )}>
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center mb-4">
+                <Trash2 size={24} className="text-rose-500" />
+              </div>
+              <h3 className={cn("text-lg font-bold mb-2", theme === 'dark' ? 'text-white' : 'text-slate-900')}>
+                Xóa máy chủ "{deleteConfirm.name}"?
+              </h3>
+              <p className={cn("text-sm", theme === 'dark' ? 'text-slate-400' : 'text-slate-500')}>
+                Thao tác này không thể hoàn tác. Tất cả dữ liệu liên quan sẽ bị xóa vĩnh viễn.
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className={cn(
+                  "flex-1 py-2.5 rounded-xl border font-bold text-sm transition-all",
+                  theme === 'dark' ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                )}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={async () => {
+                  if (onDeleteServer) {
+                    await onDeleteServer(deleteConfirm.id);
+                  }
+                  setDeleteConfirm(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm transition-all shadow-lg shadow-rose-600/20"
+              >
+                Đồng ý
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Servers List */}
       <div className={cn("border rounded-xl overflow-hidden transition-colors", theme === 'dark' ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm")}>
         <div className={cn("p-6 border-b flex justify-between items-center", theme === 'dark' ? "border-slate-800" : "border-slate-100")}>
@@ -287,10 +333,7 @@ export const Agents = ({
                     <button
                       type="button"
                       title="Xóa máy chủ"
-                      onClick={async () => {
-                        if (!window.confirm(`Xóa máy chủ "${agent.name}"? Thao tác không thể hoàn tác.`)) return;
-                        await onDeleteServer(agent.id);
-                      }}
+                      onClick={() => setDeleteConfirm({ id: agent.id, name: agent.name })}
                       className={cn(
                         'p-2 rounded-lg border transition-colors',
                         theme === 'dark'
