@@ -71,7 +71,7 @@ def _powershell_escape(s: str) -> str:
 
 
 def _ask_connection_dialog(
-    default_url: str = "http://localhost:5000",
+    default_url: str = "http://localhost:5050",
     default_key: str = "",
     title: str = "VeriChainIDS — Kết nối",
 ) -> Optional[dict]:
@@ -301,7 +301,7 @@ def _on_open_logs(icon, _item) -> None:
 def _on_change_key(icon, _item) -> None:
     global _agent
     cfg = _load_config() or {}
-    url = (cfg.get("server_url") or "http://localhost:5000").strip().rstrip("/")
+    url = (cfg.get("server_url") or "http://localhost:5050").strip().rstrip("/")
     old_key = (cfg.get("api_key") or "").strip()
     data = _ask_connection_dialog(default_url=url, default_key=old_key, title="VeriChainIDS — Đổi API Key")
     if not data:
@@ -383,7 +383,7 @@ def main() -> None:
         logger.info("VeriChainIDS Agent v3.0 (dev — có console)")
 
     api_key: Optional[str] = None
-    server_url = "http://localhost:5000"
+    server_url = "http://localhost:5050"
 
     for i, arg in enumerate(sys.argv):
         if arg in ("-k", "--api-key") and i + 1 < len(sys.argv):

@@ -26,7 +26,7 @@ def test_invalid_api_key():
     # Tạo agent với API key giả
     agent = VeriChainIDSAgentV3(
         api_key="sk_test_invalid_key_12345",
-        server_url="http://localhost:5000",
+        server_url="http://localhost:5050",
         interval=5,
         batch_size=100,
         demo_mode=False,

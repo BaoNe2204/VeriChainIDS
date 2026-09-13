@@ -695,7 +695,7 @@ class VeriChainIDSAgentV3:
     def __init__(
         self,
         api_key: str,
-        server_url: str = "http://localhost:5000",
+        server_url: str = "http://localhost:5050",
         server_id: str = "",
         interval: int = DEFAULT_INTERVAL,
         batch_size: int = DEFAULT_BATCH_SIZE,
@@ -1117,7 +1117,7 @@ def main() -> None:
         description="VeriChainIDS Agent v3 - hybrid rich telemetry + local detection + autoblock",
     )
     parser.add_argument("-k", "--api-key", required=True, help="API Key from VeriChainIDS dashboard")
-    parser.add_argument("-u", "--server-url", default="http://localhost:5000")
+    parser.add_argument("-u", "--server-url", default="http://localhost:5050")
     parser.add_argument("--server-id", default=os.getenv("VERICHAINIDS_SERVER_ID", ""))
     parser.add_argument("-i", "--interval", type=int, default=DEFAULT_INTERVAL)
     parser.add_argument("-b", "--batch-size", type=int, default=DEFAULT_BATCH_SIZE)

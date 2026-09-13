@@ -1240,7 +1240,7 @@ class VeriChainIDSAgentV3:
     def __init__(
         self,
         api_key: str,
-        server_url: str = "http://localhost:5000",
+        server_url: str = "http://localhost:5050",
         server_id: str = "",
         interval: int = DEFAULT_INTERVAL,
         batch_size: int = DEFAULT_BATCH_SIZE,
